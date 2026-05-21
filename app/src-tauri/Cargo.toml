@@ -20,3 +20,7 @@ serde = { version = "1", features = ["derive"] }
 # webp/avif decode; `webp` adds lossy webp *encoding* (libwebp).
 image = "0.25"
 webp = "0.3"
+# Native PDF. pdfium-render loads the pdfium library at runtime (shipped beside the
+# exe / fetched); printpdf builds PDFs from images (pure Rust).
+pdfium-render = "0.8"
+printpdf = "0.7"

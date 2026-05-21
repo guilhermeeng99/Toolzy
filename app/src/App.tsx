@@ -1,25 +1,59 @@
+import { useState } from "react";
 import { ImageTool } from "./components/ImageTool";
+import { PdfTool } from "./components/PdfTool";
+import { pill } from "./components/ui";
+
+type Tool = "image" | "pdf";
+
+const TOOLS: { id: Tool; label: string }[] = [
+  { id: "image", label: "Image" },
+  { id: "pdf", label: "PDF" },
+];
+
+const TOOL_META: Record<Tool, { title: string; description: string }> = {
+  image: {
+    title: "Image converter",
+    description: "Convert and resize images natively — PNG, JPG, WebP, GIF, BMP, TIFF.",
+  },
+  pdf: {
+    title: "PDF tools",
+    description: "Render PDF pages to images, or combine images into a PDF — all native.",
+  },
+};
 
 export function App() {
+  const [tool, setTool] = useState<Tool>("image");
+  const meta = TOOL_META[tool];
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-50 border-b border-outline-gray bg-snow-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1000px] items-center px-6">
+        <div className="mx-auto flex h-16 max-w-[1000px] items-center gap-4 px-6">
           <span className="text-heading font-bold text-midnight-indigo">Toolzy</span>
-          <span className="ml-3 rounded-full bg-pale-gray px-2 py-1 text-body font-semibold text-glacier-blue">
+          <span className="rounded-full bg-pale-gray px-2 py-1 text-body font-semibold text-glacier-blue">
             native
           </span>
+          <nav className="ml-auto flex gap-2">
+            {TOOLS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTool(t.id)}
+                className={pill(tool === t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1000px] px-6 py-12">
         <header className="mb-8 text-center">
-          <h1 className="text-display-sm font-bold text-midnight-indigo">Image converter</h1>
-          <p className="mx-auto mt-3 max-w-xl text-body-lg text-slate-blue">
-            Convert and resize images natively. Files are processed on your device by the app.
-          </p>
+          <h1 className="text-display-sm font-bold text-midnight-indigo">{meta.title}</h1>
+          <p className="mx-auto mt-3 max-w-xl text-body-lg text-slate-blue">{meta.description}</p>
         </header>
-        <ImageTool />
+        {tool === "image" ? <ImageTool /> : <PdfTool />}
       </main>
     </div>
   );

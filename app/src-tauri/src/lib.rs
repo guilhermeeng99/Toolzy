@@ -5,6 +5,8 @@ use image::{DynamicImage, ImageFormat, ImageReader};
 use serde::{Deserialize, Serialize};
 
 mod image_convert;
+mod pdf;
+mod pdf_build;
 
 /// Resize request from the UI. `mode`: "none" | "px" | "percent".
 #[derive(Debug, Default, Deserialize)]
@@ -99,7 +101,11 @@ fn save(img: &DynamicImage, format: ImageFormat, out: &Path) -> Result<(), Strin
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![convert_image])
+        .invoke_handler(tauri::generate_handler![
+            convert_image,
+            pdf::pdf_to_images,
+            pdf_build::images_to_pdf
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Toolzy");
 }

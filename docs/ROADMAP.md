@@ -26,7 +26,9 @@ removed and ADR-001/003 are rewritten.
 - 🚧 **B — Image full**: ✅ webp (libwebp) + gif/bmp/tiff; ✅ batch (multi-file) + native
   OS drag-drop; ✅ before/after size + delta. ⬜ AVIF (`ravif`/rav1e) + JPEG-XL
   (`jpegxl-rs`/libjxl) deferred — heavy native encoders (rav1e/libjxl toolchains).
-- ⬜ **C — PDF native**: PDF→image via `pdfium-render`; image(s)→PDF via `printpdf`.
+- ✅ **C — PDF native**: PDF→image via `pdfium-render` (`pdf_to_images`); image(s)→PDF via
+  `printpdf` (`images_to_pdf`). Two-mode PDF UI; shared `ui.tsx` (Card/Field/Slider/pill/…).
+  Runtime needs the pdfium library beside the exe (added in Phase D's binaries step).
 - ⬜ **D — Media + downloader native**: ffmpeg sidecar (MP4→MP3, video); yt-dlp sidecar
   downloader (port `download_media`, keep `--ffmpeg-location`).
 - ⬜ **E — Cutover + full docs refresh** (owner request: this is the **final step**, after
