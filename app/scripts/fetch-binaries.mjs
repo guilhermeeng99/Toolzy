@@ -21,29 +21,47 @@ const TARGETS = {
     triple: "x86_64-pc-windows-msvc",
     exe: ".exe",
     ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
-    ffmpeg: { url: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", member: "ffmpeg.exe" },
-    pdfium: { url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-win-x64.tgz", member: "pdfium.dll" },
+    ffmpeg: {
+      url: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+      member: "ffmpeg.exe",
+    },
+    pdfium: {
+      url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-win-x64.tgz",
+      member: "pdfium.dll",
+    },
   },
   "linux-x64": {
     triple: "x86_64-unknown-linux-gnu",
     exe: "",
     ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
-    ffmpeg: { url: "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz", member: "ffmpeg" },
-    pdfium: { url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-linux-x64.tgz", member: "libpdfium.so" },
+    ffmpeg: {
+      url: "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
+      member: "ffmpeg",
+    },
+    pdfium: {
+      url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-linux-x64.tgz",
+      member: "libpdfium.so",
+    },
   },
   "darwin-arm64": {
     triple: "aarch64-apple-darwin",
     exe: "",
     ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
     ffmpeg: { url: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip", member: "ffmpeg" },
-    pdfium: { url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz", member: "libpdfium.dylib" },
+    pdfium: {
+      url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz",
+      member: "libpdfium.dylib",
+    },
   },
   "darwin-x64": {
     triple: "x86_64-apple-darwin",
     exe: "",
     ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
     ffmpeg: { url: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip", member: "ffmpeg" },
-    pdfium: { url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-x64.tgz", member: "libpdfium.dylib" },
+    pdfium: {
+      url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-x64.tgz",
+      member: "libpdfium.dylib",
+    },
   },
 };
 
