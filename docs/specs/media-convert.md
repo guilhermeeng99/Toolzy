@@ -1,83 +1,59 @@
 # Media Convert Feature Spec
 
-> **Status**: Draft (Phase 3)
+> **Status**: Shipped (native). Audio targets via the ffmpeg sidecar.
 > **Last updated**: 2026-05-21
-> **Coverage**: Formats, Engine API, Business rules, UI, Edge cases, Testing
-> **Environment**: browser (web). The desktop build will route the same UI to native ffmpeg.
+> **Environment**: desktop (native)
 
-Convert the user's **own** audio/video files to audio formats, entirely in the browser, via
-`ffmpeg.wasm`. The headline case is **MP4 to MP3** (extract audio). This is distinct from the
-Phase 4 downloader, which fetches media from a link and is desktop-only.
+Convert the user's own audio/video files to audio formats using the bundled **native ffmpeg**
+sidecar. Headline case: **MP4 → MP3** (extract audio). Distinct from the downloader, which
+fetches media from a link.
 
-**Scope decisions** (locked):
+**Scope decisions:**
 
-- **Client-side only** (ADR-001), using the **single-thread** `@ffmpeg/core` so it works
-  without cross-origin isolation (no COEP needed in dev). Slower than multi-thread, but
-  robust and simple.
-- **Audio targets only in V1**: `mp3`, `m4a`, `wav`. Video transcoding (mp4 to webm, etc.)
-  is heavy in WASM and deferred.
-- **Lazy load**: the ~30 MB core is fetched only when the tool runs, never on page load.
-- **One file at a time** in V1 (ffmpeg is memory-bound). Progress comes from ffmpeg events.
-- The pure parts (argument building, output naming) live in the engine and are unit-tested;
-  the ffmpeg runtime wrapper lives in `apps/web/lib/media` (bundler/asset-coupled).
+- **Native ffmpeg** (sidecar) — fast, no WASM, no memory ceiling.
+- **Audio targets in V1**: `mp3`, `m4a`, `wav`. Video transcode deferred.
+- **Batch** (multi-file + drag-drop); each file reports its own status.
 
 ---
 
 ## 1. Formats
 
-In: any `audio/*` or `video/*` the core can demux (mp4, mov, webm, mkv, avi, mp3, wav, ...).
-Out: `mp3` (libmp3lame), `m4a` (native aac), `wav` (pcm_s16le).
-
-Size cap: `MAX_MEDIA_BYTES = 500 MB` (checked before load). WASM memory still bounds very
-large files; surfaced as an error if ffmpeg runs out.
+In: any `audio/*` or `video/*` ffmpeg can demux (mp4, mov, mkv, avi, webm, mp3, wav, …).
+Out: `mp3` (libmp3lame `-q:a 2`), `m4a` (native `aac -b:a 192k`), `wav` (`pcm_s16le`).
 
 ---
 
-## 2. Engine API + runtime
+## 2. Engine Contract (Rust command)
 
-Pure, in `packages/engine/src/media`:
-
-```ts
-export const AUDIO_TARGETS = ["mp3", "m4a", "wav"] as const;
-export type AudioTarget = (typeof AUDIO_TARGETS)[number];
-
-export function buildAudioArgs(input: string, output: string, target: AudioTarget): string[];
-export function audioOutputName(inputName: string, target: AudioTarget): string;
+```rust
+// media.rs
+#[tauri::command]
+async fn convert_media(app: AppHandle, path: String, target: String) -> Result<String, String>;
 ```
 
-Runtime, in `apps/web/lib/media/ffmpeg.ts`:
+- Builds `ffmpeg -y -i <path> -vn <codec…> <out>` (`-vn` drops video), runs the **ffmpeg
+  sidecar** (`app.shell().sidecar("ffmpeg")`), writes `base.<target>` beside the input, returns
+  the path. Non-zero exit → `Err` with the stderr tail.
+- Requires the bundled `ffmpeg` sidecar at runtime.
 
-```ts
-export function convertAudio(
-  file: File,
-  target: AudioTarget,
-  ctx?: ConvertContext, // onProgress 0..1
-): Promise<Result<ConversionOutput>>;
-```
-
-- Loads a lazily-created singleton `FFmpeg` with core/wasm served from `/ffmpeg/*`
-  (copied from `@ffmpeg/core` at build by `scripts/copy-ffmpeg.mjs`).
-- Maps ffmpeg's `progress` event to `ctx.onProgress`; ffmpeg failures map to `encode_failed`.
+UI wrapper: `app/src/lib/media.ts` → `convertMedia`.
 
 ---
 
 ## 3. Business Rules
 
 1. **`-vn`** drops any video stream; output is audio only.
-2. **Output name** = input base name + new extension (`clip.mp4` to `clip.mp3`).
+2. **Output name** = input base name + new extension, in the input's directory.
 3. **Codecs**: mp3 = `libmp3lame -q:a 2`; m4a = native `aac -b:a 192k`; wav = `pcm_s16le`.
-4. **Size cap** enforced before loading ffmpeg; over cap returns `file_too_large`.
-5. **One conversion at a time**; the UI disables the button while running.
-6. **Core is loaded once** and reused across conversions in the session.
+4. **Unsupported target** → `Err` before spawning.
+5. **Batch** sequential; one failure doesn't stop the rest.
 
 ---
 
-## 4. UI (`/tools/media`)
+## 4. UI (`Media` tab)
 
-- Drop one audio/video file.
-- Choose target (mp3 / m4a / wav).
-- Convert with a progress bar (real ffmpeg progress) and the "stays on your device" note.
-- Download the result. A first run shows a brief "loading converter (~30 MB, one time)" hint.
+Choose target (mp3/m4a/wav), pick or drop audio/video files, Convert; per-file status +
+saved path. "Converted natively with ffmpeg, on your device."
 
 ---
 
@@ -85,25 +61,20 @@ export function convertAudio(
 
 | Scenario | Expected |
 |---|---|
-| File over 500 MB | `file_too_large`, no load |
-| Unsupported/corrupt media | `encode_failed` with ffmpeg detail |
-| Target codec missing in core | `encode_failed` (graceful) |
-| Very large file exhausts WASM memory | `encode_failed`; suggest the desktop app |
-| Core fetch fails (offline first run) | `worker_failed`/`encode_failed`; retry later |
+| ffmpeg sidecar missing | `Err` (sidecar not found) |
+| Unsupported/corrupt media | `Err` with ffmpeg stderr tail |
+| Unknown target | `Err("unsupported target: …")` |
 
 ---
 
 ## 6. Testing Checklist
 
-- **Engine** (unit): `buildAudioArgs` for each target; `audioOutputName` extension swap and
-  fallback.
-- **UI** (manual / Playwright later): mp4 to mp3 happy path; progress; download.
+- **Manual / runtime**: MP4 → MP3 happy path (needs the ffmpeg sidecar). Codec arg shape is
+  simple and reviewed.
 
 ---
 
 ## 7. Out of Scope (V1)
 
-- Video transcoding (mp4 to webm/gif, resize, trim) — later, and faster on desktop.
-- Batch conversion.
-- Multi-thread core (would require COEP cross-origin isolation in dev).
-- Bitrate/sample-rate controls (sensible defaults only).
+- Video transcoding (mp4 → webm/gif, resize, trim). Bitrate/sample-rate controls. Progress
+  streaming (V1 shows a busy state).

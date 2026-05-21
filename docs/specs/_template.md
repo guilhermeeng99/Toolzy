@@ -27,26 +27,21 @@ each path, and any size caps.
 
 ---
 
-## 2. Engine Contract
+## 2. Engine Contract (Rust command)
 
-How this feature plugs into the engine (see `CLAUDE.md` → Engine). **1:1 conversions**
-implement `Converter` and register via `registerBuiltins`; **1→N / N→1 or runtime-coupled**
-tools are dedicated `Result`-returning functions (see `pdf-tools.md` / `media-convert.md`).
-Show the shape either way.
+How this feature is implemented as a `#[tauri::command]` in `app/src-tauri` (see `CLAUDE.md`
+→ Engine). Commands return `Result<T, String>`. Pure helpers go in a module with `cargo test`.
 
-```ts
-const fooConverter: Converter<FooOptions> = {
-  id: '...',
-  inputs: [...],
-  outputs: [...],
-  environment: 'browser' | 'desktop' | 'both',
-  convert(file, target, options, ctx) { /* returns Result<ConversionOutput> */ },
-};
+```rust
+#[tauri::command]
+fn foo(path: String, target: String, options: Option<FooOpts>) -> Result<FooResult, String>;
+// async fn + AppHandle when shelling out to a sidecar (ffmpeg / yt-dlp)
 ```
 
-- `FooOptions` shape (each field: type, default, constraints).
-- Which `ToolzyError` kinds this converter can return, and when.
-- Where it runs (Worker / sidecar) and how `ctx.signal` / `ctx.onProgress` are honored.
+- `FooOpts` / `FooResult` shape (serde `rename_all = "camelCase"`); each field: type, default.
+- Which `Err(String)` messages it returns, and when.
+- Native lib (compiled-in crate) vs sidecar vs runtime-loaded library; any required binary.
+- The UI wrapper in `app/src/lib/*.ts` (`invoke<T>("foo", …)`).
 
 ---
 
@@ -94,25 +89,22 @@ Transitions: ...
 
 | Scenario | Expected behavior |
 |---|---|
-| Unsupported source format | `unsupported_format`, friendly message |
-| File over size cap | `file_too_large`, no decode attempted |
-| User cancels mid-conversion | `canceled`, partial output discarded |
-| Corrupt input | `decode_failed` |
-| ... | ... |
+| Unsupported source / target | `Err("unsupported …")`, friendly message |
+| Corrupt input | `Err("decode failed: …")` |
+| Missing sidecar / runtime lib | `Err` (binary not found) |
+| One file fails in a batch | that row errors; the rest continue |
 
 ---
 
 ## 8. Testing Checklist
 
-- **Engine** (Vitest, real WASM where feasible):
-  - [ ] every format pair in the matrix
-  - [ ] each option boundary
-  - [ ] cancellation
-  - [ ] each `ToolzyError` kind
-- **UI** (Vitest + Playwright):
-  - [ ] happy path end-to-end
-  - [ ] error rendering per kind
-  - [ ] batch / ZIP (if applicable)
+- **Rust** (`cargo test`):
+  - [ ] pure helpers (dimensions / filename / arg building) at their boundaries
+  - [ ] each `Err(String)` path the command can return
+- **Manual / runtime** (needs the native binaries):
+  - [ ] happy path per format
+  - [ ] error message surfaces in the UI
+  - [ ] batch (if applicable)
 
 ---
 

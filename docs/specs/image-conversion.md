@@ -1,232 +1,102 @@
 # Image Conversion Feature Spec
 
-> **Status**: In progress. Canvas path shipped (PNG/JPG/WebP, resize, quality, batch/ZIP); AVIF/JXL via jSquash pending.
+> **Status**: Shipped (native). PNG/JPG/WebP/GIF/BMP/TIFF + resize/quality, batch, drag-drop.
+> AVIF/JPEG-XL planned.
 > **Last updated**: 2026-05-21
-> **Coverage**: Formats, Engine contract, Business rules, Options, Threading, UI, Edge cases, Testing
-> **Environment**: browser (also runs in desktop build unchanged)
+> **Environment**: desktop (native)
 
-Convert, compress, and resize raster images entirely in the browser. Drop one or many
-files, pick a target format and options, get the results back — nothing is uploaded. This is
-the MVP that proves the architecture end-to-end (registry → Worker → WASM → download).
+Convert and resize images natively on the user's machine. Pick or drop one or many files,
+choose a target format and options; each file is read, converted in Rust, and written beside
+the source. Nothing is uploaded.
 
-**Scope decisions** (locked at design time):
+**Scope decisions:**
 
-- **Raster only**: PNG, JPG, WebP, AVIF, JPEG-XL in V1. Vector (SVG) and exotic formats are
-  later/other specs.
-- **Client-side only**: no server path, ever (ADR-001). Backed by Canvas + jSquash; broad
-  formats (TIFF/GIF/BMP/HEIC-in) come via wasm-vips when that demand lands.
-- **One pipeline for convert + compress + resize**: they are options of a single image
-  converter, not three tools.
-- **Batch in, ZIP out**: multiple files convert in sequence and download individually or as
-  one ZIP.
-- **No editing** (crop/rotate/filters) in V1 — backlog (see §9).
+- **Raster only.** PNG, JPG, WebP, GIF, BMP, TIFF today; AVIF/JPEG-XL later.
+- **Native.** `image` crate for decode + most encodes; `webp` crate (libwebp) for lossy WebP.
+- **Batch in / files out.** Multiple files convert sequentially; each gets its own status.
+- **No editing** (crop/rotate/filters) in V1.
 
 ---
 
 ## 1. Supported Formats
 
-> **Shipped today:** PNG / JPG / WebP (Canvas). The AVIF and JPEG-XL rows below are the
-> **planned** target matrix (via jSquash) — not yet enabled in the build.
+Decode: anything `image` reads (incl. webp/avif input). Encode (targets): `png`, `jpg`,
+`webp`, `gif`, `bmp`, `tiff`.
 
-Decode (in) and encode (out) — target design:
-
-| From ↓ \ To → | PNG | JPG | WebP | AVIF | JPEG-XL |
-|---|---|---|---|---|---|
-| PNG  | ✅ | ✅ | ✅ | ✅ | ✅ |
-| JPG  | ✅ | ✅ | ✅ | ✅ | ✅ |
-| WebP | ✅ | ✅ | ✅ | ✅ | ✅ |
-| AVIF | ✅ | ✅ | ✅ | ✅ | ✅ |
-| JPEG-XL | ✅ | ✅ | ✅ | ✅ | ✅ |
-
-Backing engine per format:
-
-- **PNG / JPG / WebP** — Canvas API (`createImageBitmap` + `OffscreenCanvas.convertToBlob`)
-  for decode/encode; fast, zero extra payload.
-- **AVIF / JPEG-XL** — `@jsquash/avif`, `@jsquash/jxl` (WASM) for encode, and for decode when
-  the browser lacks native support.
-- **Compression quality** — jSquash encoders (mozjpeg/webp/avif/jxl) expose real quality
-  knobs; PNG uses OxiPNG (`@jsquash/oxipng`) for lossless optimization.
-
-Size cap: **`maxBytes = 100 MB`** per input file in V1 (configurable). Larger → `file_too_large`.
+- **png / gif / bmp / tiff** — `image` crate, lossless.
+- **jpg** — `image` `JpegEncoder` with quality (drops alpha; no transparency).
+- **webp** — `webp` crate (libwebp), lossy with quality.
+- **avif / jxl** — planned (`ravif` / `jpegxl-rs`; heavy native encoders).
 
 ---
 
-## 2. Engine Contract
+## 2. Engine Contract (Rust command)
 
-> **Status:** the Canvas path for `png`/`jpg`/`webp` is implemented. AVIF/JPEG-XL inputs &
-> outputs, jSquash decode/encode, and `pngOptimize` (OxiPNG) in the snippet below are
-> **planned**, not yet in `converter.ts`.
-
-```ts
-// packages/engine/src/image/converter.ts
-export interface ImageOptions {
-  quality?: number;        // 1..100, lossy formats only. Default 80.
-  resize?: {
-    mode: 'none' | 'px' | 'percent';
-    width?: number;        // px mode: target width
-    height?: number;       // px mode: target height
-    percent?: number;      // percent mode: 1..100
-    keepAspectRatio: boolean; // default true
-  };
-  pngOptimize?: boolean;   // OxiPNG pass for PNG output. Default true.
+```rust
+// app/src-tauri/src/lib.rs (+ pure helpers in image_convert.rs)
+#[derive(Deserialize)] struct ResizeOpt {           // serde rename_all = camelCase
+  mode: String,            // "none" | "px" | "percent"
+  width: Option<u32>, height: Option<u32>,
+  percent: Option<f32>, keep_aspect_ratio: bool,
 }
+#[derive(Serialize)] struct ConvertResult { path: String, in_bytes: u64, out_bytes: u64 }
 
-export const imageConverter: Converter<ImageOptions> = {
-  id: 'image',
-  inputs: ['image/png', 'image/jpeg', 'image/webp', 'image/avif', 'image/jxl'],
-  outputs: ['png', 'jpg', 'webp', 'avif', 'jxl'],
-  environment: 'both',
-  async convert(file, target, options, ctx) { /* Result<ConversionOutput> */ },
-};
+#[tauri::command]
+fn convert_image(
+  path: String, target: String, quality: Option<u8>, resize: Option<ResizeOpt>,
+) -> Result<ConvertResult, String>;
 ```
 
-Pipeline inside `convert`:
+- Reads `path`, applies resize (Lanczos3), encodes to `target`, writes `base.<ext>` beside the
+  source, returns the path + byte sizes.
+- Errors are short strings: `open failed`, `decode failed`, `encode failed`, `unsupported target`.
+- Pure helpers `target_dimensions` / `output_path` are unit-tested (`cargo test`).
 
-1. Validate size (`file.size <= maxBytes`) → else `file_too_large`.
-2. Decode to `ImageData` (Canvas for native formats; jSquash decode for AVIF/JXL when
-   needed) → on failure `decode_failed`.
-3. Apply resize (if `mode !== 'none'`) → compute target dims (respect `keepAspectRatio`).
-4. Encode to `target` with `quality` (jSquash) or Canvas; PNG runs OxiPNG if `pngOptimize`.
-   → on failure `encode_failed`.
-5. Report `ctx.onProgress` at decode/resize/encode boundaries; check `ctx.signal` between
-   steps → `canceled` if aborted.
-6. Return `{ blob, format: target, filename, bytes }`.
-
-Errors this converter can return: `file_too_large`, `unsupported_format`, `decode_failed`,
-`encode_failed`, `worker_failed`, `canceled`.
-
-Runs inside the shared Web Worker. Codec WASM is lazy-loaded on first use of a format that
-needs it (AVIF/JXL/OxiPNG), not at page load.
+UI wrapper: `app/src/lib/convert.ts` → `invoke<ConvertResult>("convert_image", …)`.
 
 ---
 
 ## 3. Business Rules
 
-1. **Convert** — output format is the user-selected `target`; extension and MIME match the
-   real encoded bytes (never just a renamed file).
-2. **Quality applies to lossy targets only** (JPG/WebP/AVIF/JXL). For PNG, the quality
-   control is hidden; `pngOptimize` (lossless) is offered instead.
-3. **Default quality is 80.** Range clamped to `1..100`.
-4. **Resize `none` (default)** keeps original dimensions.
-5. **Resize `percent`** scales both dimensions by `percent` (1..100), aspect ratio implicitly
-   preserved.
-6. **Resize `px` with `keepAspectRatio = true`** — if both width and height are given, fit
-   within the box (the smaller scale factor wins); if only one is given, the other is derived.
-7. **Resize `px` with `keepAspectRatio = false`** — stretch to exact width×height.
-8. **Never upscale silently past 100%/native** unless the user explicitly enters larger
-   dimensions; default UI never upscales.
-9. **Same-format "convert"** is allowed (acts as compress/resize/optimize in place).
-10. **Output filename** = original base name + new extension (e.g. `photo.png` → `photo.jpg`).
-    Collisions in batch are de-duplicated (`photo (1).jpg`).
-11. **Batch processes sequentially**; one file failing does not abort the rest — failed items
-    are listed with their `ToolzyError`, successful ones remain downloadable.
-12. **EXIF/orientation**: respect EXIF orientation on decode so rotated photos export upright.
-    (Stripping/keeping metadata is a backlog option, §9.)
-13. **Transparency**: converting a transparent source (PNG/WebP/AVIF) to JPG (no alpha)
-    flattens onto a white background; warn in the UI.
+1. **Output format** = `target`; extension matches the encoded bytes.
+2. **Quality** applies to lossy targets (`jpg`, `webp`), 1..100, default 80; ignored otherwise.
+3. **Resize `none`** keeps source size; **`percent`** scales by 1..100 (capped — no upscale);
+   **`px` keep-aspect** fits within the box (one dim derives the other); **`px` no keep-aspect**
+   stretches to exact W×H. Never below 1px.
+4. **Output filename** = source base name + new extension, written in the source directory.
+5. **JPG from a transparent source** drops alpha (no transparency in JPEG).
+6. **Batch** runs sequentially; one failure doesn't stop the rest — each row shows its result.
 
 ---
 
-## 4. Options & Defaults
+## 4. UI (`Image` tab)
 
-| Option | Type | Range | Default | Notes |
-|---|---|---|---|---|
-| target | enum | png/jpg/webp/avif/jxl | — | required |
-| quality | int | 1..100 | 80 | lossy targets only |
-| pngOptimize | bool | — | true | PNG target only (OxiPNG) |
-| resize.mode | enum | none/px/percent | none | |
-| resize.width / height | int px | > 0 | — | px mode |
-| resize.percent | int | 1..100 | — | percent mode |
-| resize.keepAspectRatio | bool | — | true | |
-
-The UI disables/hides invalid combinations (e.g. quality for PNG); the engine re-validates
-defensively and returns the matching `ToolzyError` if called with a bad combination.
+- Options card: target pills, quality slider (lossy only), resize (none/percent/px + keep-aspect).
+- Drop zone: native OS drag-drop or click → multi-select. Accepts the image extensions.
+- File list: per file → name, status (Working/Done), and `in → out` size with a delta. Clear.
 
 ---
 
-## 5. Threading / Performance
+## 5. Edge Cases
 
-- All decode/encode runs in the Web Worker; the main thread only marshals files and renders
-  progress.
-- Lazy-load: `@jsquash/avif`, `@jsquash/jxl`, `@jsquash/oxipng` fetched on first use.
-- Free `ImageBitmap`/`OffscreenCanvas` and revoke object URLs after each file to bound memory
-  during batch runs.
-- `file_too_large` is checked **before** decode to avoid OOM.
-- Progress is per-file (0..1); batch progress = files done / total.
-
----
-
-## 6. UI States
-
-```
-Idle ──drop/select files──▶ Ready(files[], options)
-Ready ──change options──▶ Ready (re-render, no work yet)
-Ready ──"Convert"──▶ Converting(index, progress)
-Converting ──all done──▶ Done(results[], failures[])
-Converting ──cancel──▶ Ready (discard in-flight output)
-Converting ──fatal worker error──▶ Error(worker_failed)
-Done ──"Convert more" / drop again──▶ Ready
-```
-
-Layout:
-
-- **Drop zone** (empty state): drag-and-drop or click to select; accepts the `inputs` MIME
-  list; shows the size cap.
-- **File list**: thumbnail, name, original size; per-file remove.
-- **Options panel**: target format, quality slider (live), resize controls, PNG optimize
-  toggle. Quality hidden for PNG; JPG-from-transparent shows the flatten warning (rule 13).
-- **Convert bar**: primary action; disabled until ≥1 file + valid options.
-- **Results**: per file → thumbnail, new size + delta (e.g. `−72%`), Download. Plus
-  **Download all (ZIP)**. Failures shown inline with a localized reason.
-
----
-
-## 7. Edge Cases
-
-| Scenario | Expected behavior |
+| Scenario | Expected |
 |---|---|
-| Drop a non-image / unsupported type | Rejected at the drop zone; `unsupported_format` toast |
-| File over 100 MB | `file_too_large`; not decoded; row marked failed |
-| Corrupt / truncated image | `decode_failed`; other batch files continue |
-| Encode fails (e.g. JXL WASM load error) | `encode_failed`; row failed, rest continue |
-| Cancel mid-batch | Current + remaining stop; already-finished results kept |
-| PNG target + quality set via API | Quality ignored (lossless); no error |
-| Transparent → JPG | Flatten to white, UI warned beforehand |
-| Resize to exact box, keepAspectRatio | Fit inside box; never distort |
-| Upscale beyond native | Allowed only if user types larger dims; never by default |
-| Same source & target format | Allowed; re-encodes with options (compress/resize) |
-| Two inputs produce same output name | De-dupe: `name (1).ext` |
-| EXIF-rotated photo | Exported upright (orientation applied) |
-| Huge batch (e.g. 200 files) | Sequential; memory released per file; UI stays responsive |
+| Non-image / unsupported target | `Err` on that row; others continue |
+| Corrupt image | `decode failed` on that row |
+| Same source & target format | re-encodes (acts as compress/resize) |
+| Huge batch | sequential; each row independent |
 
 ---
 
-## 8. Testing Checklist
+## 6. Testing Checklist
 
-- **Engine** (Vitest, real WASM where feasible; tiny fixture images):
-  - [ ] every From→To pair in the matrix produces a valid, correctly-typed blob
-  - [ ] quality affects output size for lossy targets; ignored for PNG
-  - [ ] resize: percent, px keep-aspect (one dim / both dims), px stretch
-  - [ ] no-upscale-by-default invariant
-  - [ ] EXIF orientation applied
-  - [ ] transparency→JPG flatten
-  - [ ] cancellation returns `canceled` and yields no output
-  - [ ] each `ToolzyError` kind (`file_too_large`, `unsupported_format`, `decode_failed`,
-        `encode_failed`)
-- **UI** (Vitest + Playwright):
-  - [ ] drop → options → convert → download happy path
-  - [ ] batch with one failing file: rest still succeed and download
-  - [ ] Download-all ZIP contains every successful result
-  - [ ] error rows render the localized message per kind
-  - [ ] quality control hidden for PNG; flatten warning shown for transparent→JPG
+- **Rust (unit)**: `target_dimensions` (percent cap, px keep-aspect one/both dims, stretch,
+  min 1px), `output_path` extension swap. (Decode/encode verified via real runs.)
+- **Manual**: each target produces a valid file; quality affects jpg/webp size; resize modes.
 
 ---
 
-## 9. Out of Scope (V1)
+## 7. Out of Scope (V1)
 
-- **Editing**: crop, rotate, flip, filters, watermark — backlog.
-- **Metadata controls**: strip/keep EXIF, set DPI — backlog option.
-- **SVG / vector** input or output — separate spec.
-- **TIFF / GIF / BMP / HEIC** decode — add via `wasm-vips` when demand appears (rule of
-  thumb: ship Canvas+jSquash first, pull in wasm-vips only when the format matrix needs it).
-- **Animated** WebP/AVIF/GIF handling — backlog (treat as first frame for now, with a UI note).
+- AVIF / JPEG-XL output (planned). Editing (crop/rotate/filters). Metadata controls. Animated
+  output. SVG/vector.

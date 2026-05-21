@@ -1,168 +1,132 @@
 # Toolzy
 
-Free, open-source, privacy-first toolbox for everyday file tasks: convert images,
-convert between PDF and images, resize and compress files, convert your own audio/video,
-and (on the desktop build) download audio/video from a link.
+A free, open-source, **native desktop** toolbox for everyday file tasks: convert images,
+turn PDFs into images (and images into PDFs), convert your own audio/video, and download
+audio/video from a link — all on your own machine.
 
-**The core promise:** for browser tools, your files never leave your device. All
-conversion runs locally — in the browser via WebAssembly, or natively in the desktop app.
-No upload, no server, no account.
+**The promise:** your files never leave your device. Conversion runs **natively** (Rust +
+bundled binaries), not in a browser sandbox — fast, reliable, no upload, no account, no server.
 
 ## What it does
 
-Features ship in phases (see [`docs/ROADMAP.md`](docs/ROADMAP.md)). Status legend:
-✅ done · 🚧 in progress · ⬜ planned.
+Status: ✅ done · 🚧 in progress · ⬜ planned. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-| Feature | Status | Where it runs |
+| Feature | Status | Engine |
 |---|---|---|
-| Image convert (PNG ⇄ JPG ⇄ WebP) | ✅ | Browser (Canvas) |
-| Image compress / resize | ✅ | Browser (Canvas) |
-| PDF → image (per page) | ✅ | Browser (`pdfjs-dist`) |
-| Image(s) → PDF | ✅ | Browser (`pdf-lib`) |
-| Convert your own audio/video (MP4 → MP3 …) | ✅ | Browser (`ffmpeg.wasm`) / native on desktop |
-| Download audio/video from a link (MP4 / MP3) | 🚧 | **Desktop only** (`yt-dlp` + `ffmpeg`) |
-| AVIF / JPEG-XL, broader image formats | ⬜ | Browser (`@jsquash/*`, `wasm-vips`) |
+| Image convert + resize (PNG/JPG/WebP/GIF/BMP/TIFF), batch, drag-drop | ✅ | Rust `image` + `webp` |
+| PDF → images (per page) | ✅ | `pdfium-render` |
+| Images → PDF | ✅ | `printpdf` |
+| Media convert (MP4 → MP3, M4A, WAV) | ✅ | `ffmpeg` sidecar |
+| Media downloader (link → MP4 / MP3) | ✅ | `yt-dlp` + `ffmpeg` sidecars |
+| AVIF / JPEG-XL image output | ⬜ | `ravif` / `jpegxl-rs` |
 
-### Why the downloader is desktop-only
+## Download
 
-Sites like YouTube block datacenter IPs ("Sign in to confirm you're not a bot"), so a
-free public download server is not viable — and hosting one carries legal/ToS risk. The
-desktop app sidesteps both: it runs `yt-dlp` on the **user's own machine and residential
-IP**, so nothing is hosted by us, there is no server cost, and the user is responsible for
-their own use. See [ADR-003](docs/specs/architecture.md#adr-003-the-downloader-is-desktop-only).
+Grab the latest installer from [GitHub Releases](https://github.com/guilhermeeng99/Toolzy/releases)
+(Windows · macOS · Linux), or build it yourself (below).
 
 ## Privacy
 
-- Browser tools process files **100% client-side**. Files are never uploaded.
-- No analytics that read file contents. No accounts. No tracking of what you convert.
-- The desktop downloader talks directly from your machine to the source site — never
-  through a Toolzy server (there isn't one).
+- Everything runs **on your machine**. Files are never uploaded.
+- No analytics that read file contents. No accounts. No tracking.
+- The downloader talks directly from your machine to the source — never through a Toolzy
+  server (there isn't one).
 
 ## Architecture
 
-One codebase, two builds: the same Next.js frontend is deployed as a static site **and**
-wrapped by Tauri into a desktop app that unlocks the native-binary features.
+A single desktop app (Tauri 2): **Rust is the engine** (conversion runs natively); the
+**React UI** is a thin webview front-end that calls Rust via `invoke()`. A tiny static site
+presents the app and links to downloads.
 
 ```
 toolzy/
-├── apps/
-│   ├── web/              # Next.js (static export) — the single frontend (web + desktop)
-│   └── desktop/          # Tauri v2 (Rust) shell + bundled sidecars (yt-dlp, ffmpeg)
-├── packages/
-│   ├── engine/           # Framework-agnostic conversion engine (TS)
-│   │   ├── image/        #   Canvas image converter (jSquash/wasm-vips planned)
-│   │   ├── pdf/          #   page-size + filename logic (pdfjs/pdf-lib runtime in apps/web/lib)
-│   │   └── media/        #   ffmpeg arg-building (ffmpeg.wasm runtime in apps/web/lib)
-│   └── config/           # Shared tsconfig / lint config
-└── docs/
-    ├── specs/            # Per-feature contracts + architecture decisions
-    └── ROADMAP.md        # Done / doing / planned
+├── app/                 # the desktop app
+│   ├── src/             #   React + TypeScript UI (Vite) — calls invoke()
+│   │   ├── components/  #     tools + shared ui.tsx
+│   │   └── lib/         #     typed invoke() wrappers
+│   └── src-tauri/       #   Rust = the engine
+│       └── src/         #     commands: image / pdf / media / download (+ pure helpers, cargo-tested)
+├── site/                # static landing + download page (Vite + Tailwind)
+└── docs/                # specs + architecture (ADRs) + roadmap
 ```
 
-> UI primitives live in `apps/web/components/ui` (shadcn/ui style). A shared
-> `packages/ui` is planned only if a second app needs them.
+Layering:
 
-Layering (Clean-Architecture spirit, adapted to TS/React):
-
-- **`packages/engine`** — pure, framework-free logic and the `Converter` contract. No
-  React, no DOM-only deps. Codecs that are bundler/asset-coupled (`ffmpeg.wasm`,
-  `pdfjs-dist`, `pdf-lib`) run in thin wrappers under `apps/web/lib`, still returning the
-  engine's `Result` — so UI **components** never import a codec directly.
-- **`apps/web`** — presentation + the codec-runtime wrappers. Components call the engine
-  (or a `lib/` wrapper); they hold no conversion logic of their own.
-- **Web Workers** run the engine off the main thread so the UI never freezes.
-- **Tauri sidecars** run native binaries (`yt-dlp`, `ffmpeg`) on the desktop build.
+- **`app/src-tauri` (Rust)** owns the conversion logic and the native libraries/sidecars.
+  Pure helpers (resize math, filename/arg building) live in their own modules with
+  `cargo test`.
+- **`app/src` (React)** is presentation only. Components call a typed `lib/*` wrapper, which
+  calls a Rust command — the UI holds no conversion logic.
+- **Native binaries** (`ffmpeg`, `yt-dlp`) ship as Tauri **sidecars**; **pdfium** is a
+  dynamic library loaded at runtime. Compiled-in crates (`image`, `webp`, `printpdf`) need no
+  external binary.
 
 ## Tech stack
 
 | Concern | Tool |
 |---|---|
-| Framework | Next.js (App Router, `output: export` static) + React |
-| Language | TypeScript (strict) |
-| Styling | Tailwind CSS + shadcn/ui |
-| Image codecs | Canvas API · `@jsquash/*` · `wasm-vips` |
-| PDF | `pdfjs-dist` (read) · `pdf-lib` (write) |
-| Media (web) | `@ffmpeg/ffmpeg` (ffmpeg.wasm) |
-| Media (desktop) | native `ffmpeg` + `yt-dlp` via Tauri sidecar |
-| Background work | Web Workers + Comlink |
-| Desktop shell | Tauri v2 (Rust) |
-| Error model | `Result<T, E>` discriminated union (no throwing across boundaries) |
-| Global UI state | React hooks; Zustand only where cross-component state is real |
-| i18n | `next-intl` (en + pt-BR) — _planned; UI is English-only today_ |
-| Monorepo | pnpm workspaces + Turborepo |
+| Shell | Tauri 2 (Rust) |
+| UI | React + TypeScript + Vite |
+| Styling | Tailwind CSS v4 |
+| Image | `image` crate (+ `webp`/libwebp); AVIF/JXL planned |
+| PDF | `pdfium-render` (read) · `printpdf` (write) — **no MuPDF** (AGPL) |
+| Media | native `ffmpeg` (sidecar) |
+| Download | `yt-dlp` (sidecar) |
+| Package manager | pnpm (each of `app/`, `site/` is standalone) |
 | Lint / format | Biome |
-| Tests | Vitest (unit) · Playwright (e2e) |
-| Web hosting | Cloudflare Pages (unlimited bandwidth, commercial-OK) |
-| Desktop dist | GitHub Releases |
-| CI | GitHub Actions |
+| CI | GitHub Actions (Biome + app/site builds) |
 
-See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the rationale behind
-each choice (ADRs).
-
-## Spec-driven development
-
-Every feature has a contract in [`docs/specs/`](docs/specs/) before code is written:
-entities/types, numbered business rules, the engine contract, UI states, and edge cases.
-Tests are written against the spec; code follows. Use [`docs/specs/_template.md`](docs/specs/_template.md)
-for new features. Full conventions live in [`CLAUDE.md`](CLAUDE.md).
+See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the rationale (ADRs).
 
 ## Running locally
 
-> Prerequisites: Node.js ≥ 22.13, pnpm ≥ 11. For the desktop build also: Rust toolchain and
-> the Tauri prerequisites for your OS.
+> Prerequisites: Node.js ≥ 22, pnpm ≥ 11, the Rust toolchain, and your OS's
+> [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) (e.g. WebView2 on Windows).
 
 ```bash
-pnpm install
-pnpm dev            # run the web app (apps/web) at http://localhost:3000
+cd app
+pnpm install --ignore-workspace
+node scripts/fetch-binaries.mjs   # downloads yt-dlp; prints where to put ffmpeg + pdfium
+pnpm tauri dev                    # run the desktop app
 ```
 
-### Desktop app (Tauri)
+Without the native binaries the app still runs; the media/download/PDF tools need them at
+runtime (`scripts/fetch-binaries.mjs` explains where each goes).
+
+### Build an installer
 
 ```bash
-pnpm desktop:dev    # run the desktop shell against the dev server
-pnpm desktop:build  # produce a signed installer for the current OS
+cd app
+pnpm tauri build                  # installer for the current OS (needs icons + binaries)
 ```
 
-The desktop build bundles `yt-dlp` and `ffmpeg` as sidecars (see
-[`docs/specs/architecture.md`](docs/specs/architecture.md#sidecars)).
-
-## Testing
+### Landing site
 
 ```bash
-pnpm test           # Vitest unit tests (engine + framework-free app helpers)
-pnpm lint           # Biome lint
-pnpm typecheck      # tsc --noEmit, strict
+cd site
+pnpm install --ignore-workspace
+pnpm dev      # preview · pnpm build → static dist/
 ```
 
-Tests follow F.I.R.S.T principles and mirror the source tree. The engine is the heavily
-tested layer (deterministic, framework-free). Playwright e2e (`pnpm test:e2e`) is **planned**
-— DOM/WASM-bound paths (canvas, ffmpeg, pdf) are not yet covered by automated tests.
+## Checks
 
-## Deploy
-
-- **Web** → Cloudflare Pages. Two options:
-  1. **Dashboard (recommended):** connect the GitHub repo in Cloudflare Pages with build
-     command `pnpm build`, output directory `apps/web/out`, and `NODE_VERSION=22`.
-  2. **Actions + wrangler:** add `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets and
-     a deploy job. CI (`.github/workflows/ci.yml`) already lints, typechecks, and builds on
-     every push/PR. `COOP`/`COEP` ship via `public/_headers` for threaded WASM.
-- **Desktop** → GitHub Releases. CI builds installers per OS and attaches them to the tag.
-
-## Contributing
-
-Open-source and contributions welcome. Read [`CLAUDE.md`](CLAUDE.md) and the relevant spec
-in [`docs/specs/`](docs/specs/) before opening a PR. New feature? Write/extend the spec
-first.
+```bash
+# from app/
+pnpm build                                         # tsc --noEmit + vite build
+cargo test --manifest-path src-tauri/Cargo.toml    # Rust unit tests
+# from repo root
+pnpm dlx @biomejs/biome ci .                        # lint + format
+```
 
 ## License
 
-App code: **MIT** (see `LICENSE`). Bundled binaries (`ffmpeg`, `yt-dlp`) keep their own
-licenses and are invoked as **separate processes** (no linking), so they do not change the
-app's license. Do not bundle AGPL libraries — see
-[ADR-005](docs/specs/architecture.md#adr-005-library--license-choices).
+App code: **MIT** (see `LICENSE`). Bundled binaries keep their own licenses and run as
+**separate processes** (sidecars) or dynamically-loaded libraries, so they don't change the
+app's license: `ffmpeg` (LGPL/GPL build), `yt-dlp` (Unlicense), `pdfium` (BSD-3). Do not
+bundle AGPL libraries — see [ADR-005](docs/specs/architecture.md#adr-005-library--license-choices).
 
 ## Legal note
 
-Toolzy is a general-purpose tool. The desktop downloader runs entirely on the user's
-machine; downloading content you do not have the right to download may violate a site's
-Terms of Service or local law. Respecting those terms is the user's responsibility.
+Toolzy is a general-purpose tool that runs entirely on the user's machine. Downloading
+content you do not have the right to download may violate a site's Terms of Service or local
+law. Respecting those terms is the user's responsibility.

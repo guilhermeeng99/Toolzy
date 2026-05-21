@@ -2,177 +2,71 @@
 
 > **Last updated**: 2026-05-21
 > Single source of truth for what is **done**, **in progress**, and **planned**.
-> Update this file in the same PR that changes scope (see `CLAUDE.md` → Post-Change Checklist).
+> Update in the same change that shifts scope (see `CLAUDE.md` → Post-Change Checklist).
 
-## 🔱 Direction change (2026-05-21): desktop-native pivot
-
-Toolzy is becoming a **desktop-only, native** app for personal use. The web-first reasons
-(SEO, reach, free hosting, zero-install for strangers) no longer apply; native gives speed +
-reliability and lets **everything — including the downloader — live in one tool**.
-
-**New stack:** Tauri 2 (Rust) · React + TypeScript + Vite · Tailwind v4 · pnpm. **Single app**
-(no monorepo): Rust is the engine, the React UI is a thin webview front-end. A tiny static
-**landing/download page** ships *after* the app.
-
-Everything under "Status at a glance" and below describes the **superseded** web build
-(`apps/web` + `packages/*`); it stays until the native app reaches parity (Phase E), then is
-removed and ADR-001/003 are rewritten.
-
-### Native phases
-- ✅ **A — Image PoC** (branch `refactor/desktop-native-vite`): `app/` scaffolded
-  (Vite+React+TS+Tailwind+Tauri 2); native `convert_image` (Rust `image` crate: png/jpg +
-  resize/quality); resize/naming logic ported with `cargo test` (7 green). Verified: tsc,
-  vite build, cargo test.
-- 🚧 **B — Image full**: ✅ webp (libwebp) + gif/bmp/tiff; ✅ batch (multi-file) + native
-  OS drag-drop; ✅ before/after size + delta. ⬜ AVIF (`ravif`/rav1e) + JPEG-XL
-  (`jpegxl-rs`/libjxl) deferred — heavy native encoders (rav1e/libjxl toolchains).
-- ✅ **C — PDF native**: PDF→image via `pdfium-render` (`pdf_to_images`); image(s)→PDF via
-  `printpdf` (`images_to_pdf`). Two-mode PDF UI; shared `ui.tsx` (Card/Field/Slider/pill/…).
-  Runtime needs the pdfium library beside the exe (added in Phase D's binaries step).
-- ✅ **D — Media + downloader native**: `convert_media` (ffmpeg sidecar: mp3/m4a/wav,
-  batch + drag-drop) and `download_media` (yt-dlp sidecar, `--ffmpeg-location`, prints final
-  path; cargo-tested arg builder). tauri-plugin-shell + `externalBin` + shell capability;
-  `scripts/fetch-binaries.mjs` (yt-dlp auto, ffmpeg/pdfium manual). Media + Download UI in
-  the app nav. _Runtime needs the sidecar binaries — verify on a real build._
-- ⬜ **E — Cutover + full docs refresh** (owner request: this is the **final step**, after
-  B–D are done — a general review that updates every doc and removes all dead code/files):
-  - **Remove superseded web/monorepo files**: `apps/web`, the old `apps/desktop` Tauri shell,
-    `packages/engine`, `packages/config`, `turbo.json`, root `pnpm-workspace.yaml`, root web
-    configs, `apps/web/public/_headers`, the web `vitest.config.ts`, and any other dead code/
-    assets left from the web build. Grep for references to removed paths before deleting.
-  - **Refresh ALL docs** to the desktop-native reality: `README.md`, `CLAUDE.md`, every
-    `docs/specs/*` (rewrite ADR-001/003 desktop-first; update architecture, image/pdf/
-    media/download, design-system) and this ROADMAP.
-  - **Single-app CI**: Rust `cargo test` + front-end build + `biome`; site deploy workflow.
-  - **Verify**: nothing references removed paths; build/lint/test green.
-- ✅ **F — Landing site**: static page (`site/`, Vite + Tailwind) presenting the app + a
-  download CTA to GitHub Releases. Built early at the owner's request; point the download
-  link at real installer assets once published, and wire a Pages deploy.
-
----
+Toolzy is a **desktop-native** app (Tauri 2 · React/TS/Vite · Tailwind · Rust engine). It
+began as a client-side web app (Next.js) + a Tauri shell; in **2026-05** it pivoted to
+desktop-only native — the web build and monorepo were removed (see
+[ADR-007](specs/architecture.md#adr-007-pivot-from-web-to-desktop-native)).
 
 ## Legend
 
-- ✅ **Done** — shipped and verified.
-- 🚧 **In progress** — actively being built.
-- ⬜ **Planned** — agreed, not started.
-- 💡 **Backlog / idea** — not yet committed.
+✅ Done · 🚧 In progress · ⬜ Planned · 💡 Backlog
+
+---
 
 ## Status at a glance
 
 | Phase | Theme | Status |
 |---|---|---|
-| Phase 0 | Foundation (docs, scaffold, engine, CI) | ✅ Done |
-| Phase 1 | Image: convert · compress · resize | 🚧 In progress (Canvas shipped; AVIF/JXL pending) |
-| Phase 2 | PDF ⇄ image | ✅ Done |
-| Phase 3 | Media convert (own files) | ✅ Done |
-| Phase 4 | Desktop app + media downloader | 🚧 In progress |
+| A | Image PoC (native scaffold) | ✅ Done |
+| B | Image full (formats, batch, drag-drop) | 🚧 webp + gif/bmp/tiff done; AVIF/JXL planned |
+| C | PDF native (pdfium / printpdf) | ✅ Done |
+| D | Media + downloader (ffmpeg / yt-dlp) | ✅ Done |
+| E | Cutover + full docs refresh | ✅ Done |
+| F | Landing site | ✅ Done |
 
 ---
 
-## ✅ Done
+## Detail
 
-### Decisions & docs
-- ✅ Architecture decided: client-side-first, no backend, one codebase → two builds
-  (web + Tauri desktop). See [`specs/architecture.md`](specs/architecture.md).
-- ✅ Hosting decided: Cloudflare Pages for web (unlimited bandwidth, commercial-OK).
-- ✅ Downloader strategy decided: **desktop-only**, runs on the user's residential IP — no
-  hosted server, no proxy cost, no ToS liability for us.
-- ✅ License/library policy decided: app code MIT; avoid AGPL (no MuPDF); native binaries as
-  sidecars (separate processes).
-- ✅ Documentation structured: `README.md`, `CLAUDE.md`, `docs/specs/`, this roadmap,
-  spec template, and the first feature spec (`image-conversion.md`).
-- ✅ Design system decided + documented (`specs/design-system.md`): Calendly "Sky Blueprint"
-  tokens, light theme, Montserrat as the free substitute for proprietary Gilroy.
-
-### Foundation (Phase 0 build)
-- ✅ Monorepo: pnpm workspaces (`apps/web`, `packages/config`). Turborepo deferred until a
-  second buildable package (`engine`) exists — not worth the ceremony for one app yet.
-- ✅ `apps/web`: Next.js 15 (App Router, `output: export`) + TypeScript strict + Tailwind v4.
-- ✅ Design tokens wired into Tailwind v4 `@theme` (`app/globals.css`); Montserrat via
-  `next/font`. Base UI: `Button` (4 variants), `Card`, `Badge` + landing shell
-  (header, hero, tools grid, privacy strip, footer).
-- ✅ Tooling: Biome (lint/format), strict shared tsconfig, `_headers` (COOP/COEP).
-- ✅ Build verified: `pnpm build` → static export green (type-check passes, ~102 kB First Load JS).
+- ✅ **A — Image PoC**: `app/` scaffolded (Vite + React + TS + Tailwind v4 + Tauri 2); native
+  `convert_image` (`image` crate); resize/naming helpers with `cargo test`.
+- 🚧 **B — Image full**: ✅ webp (libwebp) + gif/bmp/tiff; ✅ batch + native OS drag-drop;
+  ✅ before/after size + delta. ⬜ AVIF (`ravif`/rav1e) + JPEG-XL (`jpegxl-rs`/libjxl) —
+  heavy native encoders, deferred.
+- ✅ **C — PDF native**: `pdf_to_images` (pdfium-render) + `images_to_pdf` (printpdf);
+  two-mode PDF UI; shared `ui.tsx`. Runtime needs the pdfium library beside the exe.
+- ✅ **D — Media + downloader**: `convert_media` (ffmpeg sidecar: mp3/m4a/wav, batch) and
+  `download_media` (yt-dlp sidecar, `--ffmpeg-location`, prints final path; arg builder
+  cargo-tested). tauri-plugin-shell + `externalBin` + shell capability;
+  `scripts/fetch-binaries.mjs`.
+- ✅ **E — Cutover + docs**: removed `apps/web`, old `apps/desktop`, `packages/*`, Turborepo,
+  pnpm workspace, root vitest. Rewrote README, CLAUDE.md, all `docs/specs/*` (ADRs
+  desktop-first) and this roadmap. CI = Biome + app/site builds.
+- ✅ **F — Landing site**: static `site/` (Vite + Tailwind) presenting the app + a download
+  CTA to GitHub Releases.
 
 ---
 
-## 🚧 In progress
+## Next / open
 
-### Phase 0 — Foundation
-- ✅ `packages/engine`: `Converter` interface, registry (`registerBuiltins`), `Result`/
-  `ToolzyError` types, Web Worker bridge (Comlink). Turborepo wired.
-- ✅ Test tooling: Vitest (unit) wired; engine + app helpers covered. _(Playwright e2e: planned.)_
-- ✅ CI: GitHub Actions → lint + typecheck + test + build on push/PR. _(Cloudflare deploy job:
-  dashboard-connected; Actions deploy optional — see README.)_
-- ✅ Repo init: `git init`, MIT `LICENSE`, pushed to GitHub.
+- ⬜ AVIF + JPEG-XL image output (heavy native encoders).
+- ⬜ First real installers: generate final icons, fetch sidecars + pdfium, `pnpm tauri build`
+  per OS, publish to GitHub Releases; point the site download link at the assets.
+- ⬜ Site deploy workflow (GitHub/Cloudflare Pages).
+- ⬜ Live progress for media convert + download (stream sidecar output).
+- ⬜ Rust CI job (needs Tauri Linux deps + sidecars present).
 
-**Exit criteria (met):** green CI; the image converter wired end-to-end (registry →
-Worker → Canvas → download). Cloudflare deploy is dashboard-driven.
+## Backlog / ideas
 
----
-
-## ⬜ Planned
-
-### Phase 1 — Image (MVP) · spec: [`image-conversion.md`](specs/image-conversion.md)
-- ✅ Convert PNG / JPG / WebP (Canvas API, in a Web Worker via Comlink).
-- ✅ Compress with quality slider + live before/after size and delta.
-- ✅ Resize (px or %), keep-aspect option; EXIF orientation applied; transparent to JPG flattens to white.
-- ✅ Batch: drop many files, convert all, per-file or ZIP download (fflate).
-- ✅ Tool page at `/tools/image`, linked from the landing grid.
-- ⬜ AVIF / JPEG-XL via jSquash (needs WASM bundling in Next).
-- ⬜ Broaden formats with `wasm-vips` (TIFF, GIF, BMP, HEIC-in) when needed.
-- ⬜ Playwright e2e smoke for the tool.
-
-**Exit criteria:** drag image(s) → pick target/quality/size → download, fully client-side,
-off-main-thread, with the format matrix in the spec covered by tests.
-
-### Phase 2 — PDF ⇄ image · spec: [`pdf-tools.md`](specs/pdf-tools.md)
-- ✅ PDF to images (per page, choose PNG/JPG and scale) via `pdfjs-dist`.
-- ✅ Images to PDF (reorder, page size fit/A4/Letter) via `pdf-lib`.
-- ✅ Multi-page PDF from many images; page grid with per-page and ZIP download.
-- ✅ Tool page at `/tools/pdf` (tabbed), linked from the landing grid.
-- 💡 PDF page operations (rotate/delete/compress/split): evaluate later.
-
-### Phase 3 — Media convert (own files) · spec: [`media-convert.md`](specs/media-convert.md)
-- ✅ Extract/convert audio to MP3 / M4A / WAV via `ffmpeg.wasm` (single-thread core).
-- ✅ Lazy-load the ~30 MB core only on first use; served same-origin from `/ffmpeg/*`.
-- ✅ Real ffmpeg progress bar; "stays on your device" messaging.
-- ✅ Tool page at `/tools/media`, linked from the landing grid.
-- ⬜ Video transcoding (mp4 to webm/gif, trim, resize): heavy in WASM, faster on desktop.
-- ⬜ Cancel mid-run and batch (single-thread core limits this; revisit later).
-- Note: on the desktop build, route this UI to the native ffmpeg sidecar for speed.
-
-### Phase 4 — Desktop app + downloader · spec: [`media-download.md`](specs/media-download.md)
-- ✅ Web build shows a "get the desktop app" placeholder at `/tools/download`.
-- ✅ Capability detection (`lib/desktop.ts`) + lazy `@tauri-apps/api` invoke wrapper.
-- ✅ Tauri v2 scaffold (`apps/desktop`, outside the pnpm workspace so CI/web ignore it):
-  config, Rust `download_media` command (yt-dlp sidecar), capabilities, `fetch-binaries`
-  script, build docs.
-- ✅ `download_media` points yt-dlp at the bundled ffmpeg via `--ffmpeg-location` and returns
-  the final file path (`--print after_move:filepath`).
-- ⬜ First local build: generate icons, fetch sidecars, run `pnpm desktop:build` (needs the
-  Rust toolchain). Not run in this environment.
-- ⬜ Stream live yt-dlp progress to the UI (V1 shows a busy state).
-- ⬜ Cross-OS installers via a CI matrix, published to GitHub Releases.
-
----
-
-## 💡 Backlog / ideas
-
-- 💡 Image tools: crop, rotate, background removal (WASM model), watermark, color/EXIF strip.
-- 💡 PDF: compress, split, password add/remove (client-side).
-- 💡 Other converters: SVG → PNG, ICO generator/favicon set, GIF ⇄ MP4.
-- 💡 PWA install + offline (cache WASM) for the web build.
-- 💡 i18n beyond en/pt-BR.
-- 💡 Donation link (no feature gating).
-- 💡 Per-tool deep links + shareable presets (no file data, just settings).
-
----
+- 💡 Image: crop/rotate, background removal, watermark, EXIF strip.
+- 💡 PDF: compress, split/merge, reorder, password add/remove.
+- 💡 Video transcode (mp4 → webm/gif, trim, resize) via native ffmpeg.
+- 💡 In-app save-folder picker; reorder/drag in batch lists.
+- 💡 Auto-update (Tauri updater) + signed builds.
 
 ## Out of scope (deliberate)
 
-- Hosted/server-side processing or a public download API — see
-  [ADR-001](specs/architecture.md#adr-001-client-side-first) /
-  [ADR-003](specs/architecture.md#adr-003-the-downloader-is-desktop-only).
-- Accounts, cloud storage, paid tiers.
+- Any hosted/server-side processing or a web app (desktop-native; only the static landing
+  page is web). Accounts, cloud storage, sync. Paid tiers / feature gating.

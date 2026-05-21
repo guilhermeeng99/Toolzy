@@ -1,10 +1,10 @@
 # Design System Spec
 
-> **Status**: In progress (tokens + base components landing in Phase 0)
+> **Status**: Shipped (tokens + shared components in the desktop app)
 > **Last updated**: 2026-05-21
-> **Coverage**: Theme, Colors, Typography, Spacing, Radius, Elevation, Components, Layout, Do/Don't, Tailwind mapping, a11y
-> **Source of truth**: `apps/web/app/globals.css` (`@theme` block). Derived from the Calendly
-> reference the owner provided (`tokens.json` / `theme.css` / `variables.css` + `DESIGN.md`).
+> **Coverage**: Theme, Colors, Typography, Spacing, Radius, Elevation, Components, Layout, Do/Don't, a11y
+> **Source of truth**: `app/src/styles.css` (`@theme` block); shared components in
+> `app/src/components/ui.tsx`. Derived from the Calendly reference the owner provided.
 
 Toolzy follows the **Calendly "Sky Blueprint on Bright Paper"** aesthetic: a bright, light
 theme with deep indigo text, a single confident action-blue for interaction, soft
@@ -27,12 +27,12 @@ The reference uses **Gilroy**, which is a **commercial/proprietary font** — we
 it in an open-source project. The reference's own documented substitute is **Montserrat**
 (SIL Open Font License, free, geometric, very close match).
 
-**Decision:** ship **Montserrat** as the actual loaded family (via `next/font/google`,
-self-hosted at build), and keep the token name `--font-gilroy` pointing at it so component
-code and the reference vocabulary stay aligned:
+**Decision:** ship **Montserrat** as the actual loaded family (bundled via
+`@fontsource/montserrat`), and keep the token name `--font-gilroy` so component code and the
+reference vocabulary stay aligned:
 
 ```
---font-gilroy: var(--font-montserrat), 'Gilroy', ui-sans-serif, system-ui, sans-serif;
+--font-gilroy: "Montserrat", ui-sans-serif, system-ui, sans-serif;
 ```
 
 If a licensed Gilroy is ever purchased, swap the `var(--font-montserrat)` source — no
@@ -128,7 +128,7 @@ Don't put heavy shadows on non-interactive, non-emphasized elements.
 
 ## 7. Components
 
-Class recipes (Tailwind v4 utilities). Implemented in `apps/web/components/ui/`.
+Class recipes (Tailwind v4 utilities). Implemented in `app/src/components/ui.tsx`.
 
 ### Button
 - **Primary CTA**: `bg-action-blue text-snow-white rounded-lg font-semibold px-4 py-1.5`
