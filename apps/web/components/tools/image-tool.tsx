@@ -4,6 +4,7 @@ import { Dropzone } from "@/components/tools/dropzone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/cn";
 import { downloadZip, triggerDownload } from "@/lib/download";
 import { formatBytes, sizeDelta } from "@/lib/format";
@@ -182,13 +183,12 @@ export function ImageTool() {
 
         {isLossy ? (
           <Field label={`Quality: ${quality}`}>
-            <input
-              type="range"
+            <Slider
               min={1}
               max={100}
               value={quality}
               onChange={(e) => setQuality(Number(e.target.value))}
-              className="w-full accent-action-blue"
+              className="w-full"
               aria-label="Quality"
             />
           </Field>
@@ -215,13 +215,12 @@ export function ImageTool() {
 
           {resizeMode === "percent" ? (
             <div className="mt-3 flex items-center gap-3">
-              <input
-                type="range"
+              <Slider
                 min={1}
                 max={100}
                 value={percent}
                 onChange={(e) => setPercent(Number(e.target.value))}
-                className="w-48 accent-action-blue"
+                className="w-48"
                 aria-label="Resize percent"
               />
               <span className="text-body-lg text-midnight-indigo">{percent}%</span>

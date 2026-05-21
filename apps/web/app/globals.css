@@ -80,3 +80,82 @@
     line-height: 1.6;
   }
 }
+
+@layer components {
+  /*
+   * Range slider. Track is pale-gray; the filled portion is action-blue (driven
+   * by the inline `--fill` percentage on WebKit, and ::-moz-range-progress on
+   * Firefox). Thumb is an action-blue disc with a white ring and soft shadow.
+   * Used via the <Slider> component.
+   */
+  .toolzy-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-pale-gray);
+    cursor: pointer;
+  }
+
+  .toolzy-range::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-action-blue) var(--fill, 0%),
+      var(--color-pale-gray) var(--fill, 0%)
+    );
+  }
+
+  .toolzy-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -6px;
+    height: 18px;
+    width: 18px;
+    border-radius: 9999px;
+    background: var(--color-action-blue);
+    border: 2px solid var(--color-snow-white);
+    box-shadow: rgba(71, 103, 136, 0.3) 0px 1px 4px;
+    transition: transform 0.1s ease;
+  }
+
+  .toolzy-range:hover::-webkit-slider-thumb,
+  .toolzy-range:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+  }
+
+  .toolzy-range::-moz-range-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-pale-gray);
+  }
+
+  .toolzy-range::-moz-range-progress {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-action-blue);
+  }
+
+  .toolzy-range::-moz-range-thumb {
+    height: 18px;
+    width: 18px;
+    border: 2px solid var(--color-snow-white);
+    border-radius: 9999px;
+    background: var(--color-action-blue);
+    box-shadow: rgba(71, 103, 136, 0.3) 0px 1px 4px;
+  }
+
+  .toolzy-range:focus-visible {
+    outline: none;
+  }
+
+  .toolzy-range:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(0, 107, 255, 0.25);
+  }
+
+  .toolzy-range:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 4px rgba(0, 107, 255, 0.25);
+  }
+}

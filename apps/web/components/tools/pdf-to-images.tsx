@@ -4,6 +4,7 @@ import { Field, Segmented } from "@/components/tools/controls";
 import { Dropzone } from "@/components/tools/dropzone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
 import { downloadZip, triggerDownload } from "@/lib/download";
 import { formatBytes } from "@/lib/format";
 import { pdfToImages } from "@/lib/pdf/render";
@@ -65,14 +66,13 @@ export function PdfToImages() {
           <Segmented options={["png", "jpg"] as const} value={format} onChange={setFormat} />
         </Field>
         <Field label={`Scale: ${scale}x`}>
-          <input
-            type="range"
+          <Slider
             min={1}
             max={4}
             step={1}
             value={scale}
             onChange={(e) => setScale(Number(e.target.value))}
-            className="w-full accent-action-blue"
+            className="w-full"
             aria-label="Render scale"
           />
         </Field>
