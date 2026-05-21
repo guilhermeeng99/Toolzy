@@ -45,9 +45,9 @@ export const TOOLS: ToolMeta[] = [
     slug: "media-convert",
     name: "Media converter",
     description: "Convert your own audio and video, like MP4 to MP3, on your device.",
-    href: "#",
+    href: "/tools/media",
     icon: "media",
-    status: "soon",
+    status: "live",
     env: "browser",
   },
   {

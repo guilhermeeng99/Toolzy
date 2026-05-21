@@ -3,12 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/copy-pdf-worker.mjs && next dev",
-    "build": "node scripts/copy-pdf-worker.mjs && next build",
+    "dev": "node scripts/copy-pdf-worker.mjs && node scripts/copy-ffmpeg.mjs && next dev",
+    "build": "node scripts/copy-pdf-worker.mjs && node scripts/copy-ffmpeg.mjs && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.6",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
     "@toolzy/engine": "workspace:*",
     "comlink": "^4.4.2",
     "fflate": "^0.8.2",

@@ -18,7 +18,7 @@
 | Phase 0 | Foundation (docs, scaffold, CI/deploy) | 🚧 In progress |
 | Phase 1 | Image: convert · compress · resize | 🚧 In progress |
 | Phase 2 | PDF ⇄ image | ✅ Done |
-| Phase 3 | Media convert (own files) | ⬜ Planned |
+| Phase 3 | Media convert (own files) | ✅ Done |
 | Phase 4 | Desktop app + media downloader | ⬜ Planned |
 
 ---
@@ -87,12 +87,14 @@ off-main-thread, with the format matrix in the spec covered by tests.
 - ✅ Tool page at `/tools/pdf` (tabbed), linked from the landing grid.
 - 💡 PDF page operations (rotate/delete/compress/split): evaluate later.
 
-### Phase 3 — Media convert (own files) · spec: `specs/media-convert.md` (to be written)
-- ⬜ MP4 → MP3 (audio extract) and common A/V format conversions via `ffmpeg.wasm`.
-- ⬜ Lazy-load the ffmpeg WASM (~30 MB) only when the tool opens.
-- ⬜ Progress + cancel; clear "this stays on your device" messaging.
-- ⚠️ Constraint: ffmpeg.wasm is slow/heavy. On desktop, route the same UI to the **native**
-  ffmpeg sidecar for speed.
+### Phase 3 — Media convert (own files) · spec: [`media-convert.md`](specs/media-convert.md)
+- ✅ Extract/convert audio to MP3 / M4A / WAV via `ffmpeg.wasm` (single-thread core).
+- ✅ Lazy-load the ~30 MB core only on first use; served same-origin from `/ffmpeg/*`.
+- ✅ Real ffmpeg progress bar; "stays on your device" messaging.
+- ✅ Tool page at `/tools/media`, linked from the landing grid.
+- ⬜ Video transcoding (mp4 to webm/gif, trim, resize): heavy in WASM, faster on desktop.
+- ⬜ Cancel mid-run and batch (single-thread core limits this; revisit later).
+- Note: on the desktop build, route this UI to the native ffmpeg sidecar for speed.
 
 ### Phase 4 — Desktop app + downloader · spec: `specs/media-download.md` (to be written)
 - ⬜ Tauri v2 shell wrapping `apps/web`; capability detection (`environment: 'desktop'`).

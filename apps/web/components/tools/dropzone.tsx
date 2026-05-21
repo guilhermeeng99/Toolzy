@@ -6,9 +6,13 @@ import { useCallback, useRef, useState } from "react";
 export function Dropzone({
   accept,
   onFiles,
+  label = "Drop files here",
+  hint = "or click to choose. Files never leave your device.",
 }: {
   accept: string;
   onFiles: (files: File[]) => void;
+  label?: string;
+  hint?: string;
 }) {
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,10 +55,8 @@ export function Dropzone({
         className="hidden"
         onChange={(e) => handle(e.target.files)}
       />
-      <span className="text-body-lg font-semibold text-midnight-indigo">Drop images here</span>
-      <span className="text-body text-slate-blue">
-        or click to choose files. They never leave your device.
-      </span>
+      <span className="text-body-lg font-semibold text-midnight-indigo">{label}</span>
+      <span className="text-body text-slate-blue">{hint}</span>
     </button>
   );
 }

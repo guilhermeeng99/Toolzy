@@ -4,3 +4,4 @@ export * from "./errors";
 export * from "./registry";
 export * from "./image";
 export * from "./pdf";
+export * from "./media";
