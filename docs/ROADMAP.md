@@ -4,6 +4,37 @@
 > Single source of truth for what is **done**, **in progress**, and **planned**.
 > Update this file in the same PR that changes scope (see `CLAUDE.md` → Post-Change Checklist).
 
+## 🔱 Direction change (2026-05-21): desktop-native pivot
+
+Toolzy is becoming a **desktop-only, native** app for personal use. The web-first reasons
+(SEO, reach, free hosting, zero-install for strangers) no longer apply; native gives speed +
+reliability and lets **everything — including the downloader — live in one tool**.
+
+**New stack:** Tauri 2 (Rust) · React + TypeScript + Vite · Tailwind v4 · pnpm. **Single app**
+(no monorepo): Rust is the engine, the React UI is a thin webview front-end. A tiny static
+**landing/download page** ships *after* the app.
+
+Everything under "Status at a glance" and below describes the **superseded** web build
+(`apps/web` + `packages/*`); it stays until the native app reaches parity (Phase E), then is
+removed and ADR-001/003 are rewritten.
+
+### Native phases
+- ✅ **A — Image PoC** (branch `refactor/desktop-native-vite`): `app/` scaffolded
+  (Vite+React+TS+Tailwind+Tauri 2); native `convert_image` (Rust `image` crate: png/jpg +
+  resize/quality); resize/naming logic ported with `cargo test` (7 green). Verified: tsc,
+  vite build, cargo test.
+- ⬜ **B — Image full**: webp (libwebp), AVIF (`ravif`), JPEG-XL (`jpegxl-rs`); batch +
+  native drag-drop; before/after size + delta.
+- ⬜ **C — PDF native**: PDF→image via `pdfium-render`; image(s)→PDF via `printpdf`.
+- ⬜ **D — Media + downloader native**: ffmpeg sidecar (MP4→MP3, video); yt-dlp sidecar
+  downloader (port `download_media`, keep `--ffmpeg-location`).
+- ⬜ **E — Cutover**: delete `apps/web`, `packages/*`, Turborepo, workspace; rewrite
+  ADR-001/003 (desktop-first); single-app CI (Rust `cargo test` + front-end build).
+- ⬜ **F — Landing site**: minimal static page (`site/`) presenting the app + download links
+  to GitHub Releases. **Do after the app is done.**
+
+---
+
 ## Legend
 
 - ✅ **Done** — shipped and verified.
