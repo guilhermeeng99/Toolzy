@@ -2,21 +2,12 @@
 node_modules/
 .pnpm-store/
 
-# next.js
-.next/
-out/
-
-# generated at build time (copied from node_modules)
-apps/web/public/pdf.worker.min.mjs
-apps/web/public/ffmpeg/
-
 # build / cache
 dist/
-.turbo/
+.vite/
 *.tsbuildinfo
-next-env.d.ts
 
-# tauri (later)
+# rust / tauri (also covered by app/src-tauri/.gitignore)
 target/
 
 # env

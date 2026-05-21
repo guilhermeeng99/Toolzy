@@ -17,19 +17,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
-      - name: Install
-        run: pnpm install --frozen-lockfile
+      - name: Lint + format (Biome)
+        run: pnpm dlx @biomejs/biome@1.9.4 ci .
 
-      - name: Lint (Biome)
-        run: pnpm exec biome ci .
+      - name: Build app (typecheck + Vite)
+        run: |
+          pnpm -C app install --ignore-workspace
+          pnpm -C app build
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Build site (Vite)
+        run: |
+          pnpm -C site install --ignore-workspace
+          pnpm -C site build
 
-      - name: Test
-        run: pnpm test
-
-      - name: Build (static export)
-        run: pnpm build
+  # Rust (cargo test) runs locally / on release builds: it needs the Tauri Linux
+  # system deps + the sidecar binaries present, which are out of scope for this
+  # lightweight CI. See app/README.md.
