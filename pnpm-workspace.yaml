@@ -1,5 +1,7 @@
 packages:
-  - "apps/*"
+  # apps/desktop (Tauri) is intentionally excluded: it builds with the Rust
+  # toolchain via `pnpm desktop:*`, not with the web install/CI.
+  - "apps/web"
   - "packages/*"
 allowBuilds:
   '@biomejs/biome': true

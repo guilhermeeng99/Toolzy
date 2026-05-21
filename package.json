@@ -13,7 +13,9 @@
     "typecheck": "turbo run typecheck",
     "test": "vitest run",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "desktop:dev": "pnpm -C apps/desktop tauri dev",
+    "desktop:build": "pnpm -C apps/desktop tauri build"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

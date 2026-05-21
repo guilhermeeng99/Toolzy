@@ -19,7 +19,7 @@
 | Phase 1 | Image: convert · compress · resize | 🚧 In progress |
 | Phase 2 | PDF ⇄ image | ✅ Done |
 | Phase 3 | Media convert (own files) | ✅ Done |
-| Phase 4 | Desktop app + media downloader | ⬜ Planned |
+| Phase 4 | Desktop app + media downloader | 🚧 In progress |
 
 ---
 
@@ -96,13 +96,16 @@ off-main-thread, with the format matrix in the spec covered by tests.
 - ⬜ Cancel mid-run and batch (single-thread core limits this; revisit later).
 - Note: on the desktop build, route this UI to the native ffmpeg sidecar for speed.
 
-### Phase 4 — Desktop app + downloader · spec: `specs/media-download.md` (to be written)
-- ⬜ Tauri v2 shell wrapping `apps/web`; capability detection (`environment: 'desktop'`).
-- ⬜ Bundle `yt-dlp` + `ffmpeg` as sidecars; auto-update `yt-dlp` binary.
-- ⬜ Download UI: paste link → pick MP4 (quality) or MP3 → save to disk. Runs on the user's
-  IP; nothing routed through us.
-- ⬜ Cross-OS installers (Win/macOS/Linux) published to GitHub Releases via CI.
-- ⬜ Web build shows a "Get the desktop app" placeholder on the downloader route.
+### Phase 4 — Desktop app + downloader · spec: [`media-download.md`](specs/media-download.md)
+- ✅ Web build shows a "get the desktop app" placeholder at `/tools/download`.
+- ✅ Capability detection (`lib/desktop.ts`) + lazy `@tauri-apps/api` invoke wrapper.
+- ✅ Tauri v2 scaffold (`apps/desktop`, outside the pnpm workspace so CI/web ignore it):
+  config, Rust `download_media` command (yt-dlp sidecar), capabilities, `fetch-binaries`
+  script, build docs.
+- ⬜ First local build: generate icons, fetch sidecars, run `pnpm desktop:build` (needs the
+  Rust toolchain). Not run in this environment.
+- ⬜ Wire `--ffmpeg-location` to the bundled ffmpeg; stream live yt-dlp progress to the UI.
+- ⬜ Cross-OS installers via a CI matrix, published to GitHub Releases.
 
 ---
 
