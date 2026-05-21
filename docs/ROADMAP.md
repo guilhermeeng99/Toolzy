@@ -16,7 +16,7 @@
 | Phase | Theme | Status |
 |---|---|---|
 | Phase 0 | Foundation (docs, scaffold, CI/deploy) | 🚧 In progress |
-| Phase 1 | Image: convert · compress · resize | ⬜ Planned |
+| Phase 1 | Image: convert · compress · resize | 🚧 In progress |
 | Phase 2 | PDF ⇄ image | ⬜ Planned |
 | Phase 3 | Media convert (own files) | ⬜ Planned |
 | Phase 4 | Desktop app + media downloader | ⬜ Planned |
@@ -68,11 +68,14 @@ from a Worker with one trivial converter wired end-to-end.
 ## ⬜ Planned
 
 ### Phase 1 — Image (MVP) · spec: [`image-conversion.md`](specs/image-conversion.md)
-- ⬜ Convert: PNG ⇄ JPG ⇄ WebP (Canvas), + AVIF / JPEG-XL (jSquash).
-- ⬜ Compress with quality slider + live before/after size preview.
-- ⬜ Resize (by px or %), keep aspect ratio option.
-- ⬜ Batch: drop many files, convert all, download as ZIP.
-- ⬜ Broaden format coverage with `wasm-vips` (TIFF, GIF, BMP, HEIC-in) when needed.
+- ✅ Convert PNG / JPG / WebP (Canvas API, in a Web Worker via Comlink).
+- ✅ Compress with quality slider + live before/after size and delta.
+- ✅ Resize (px or %), keep-aspect option; EXIF orientation applied; transparent to JPG flattens to white.
+- ✅ Batch: drop many files, convert all, per-file or ZIP download (fflate).
+- ✅ Tool page at `/tools/image`, linked from the landing grid.
+- ⬜ AVIF / JPEG-XL via jSquash (needs WASM bundling in Next).
+- ⬜ Broaden formats with `wasm-vips` (TIFF, GIF, BMP, HEIC-in) when needed.
+- ⬜ Playwright e2e smoke for the tool.
 
 **Exit criteria:** drag image(s) → pick target/quality/size → download, fully client-side,
 off-main-thread, with the format matrix in the spec covered by tests.

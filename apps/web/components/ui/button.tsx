@@ -38,6 +38,18 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
 }
 
-export function Button({ variant = "primary", size = "md", className, ...props }: ButtonProps) {
-  return <button className={buttonClasses(variant, size, className)} {...props} />;
+export function Button({
+  variant = "primary",
+  size = "md",
+  className,
+  type,
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      type={type ?? "button"}
+      className={buttonClasses(variant, size, className)}
+      {...props}
+    />
+  );
 }

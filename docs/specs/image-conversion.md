@@ -1,6 +1,6 @@
 # Image Conversion Feature Spec
 
-> **Status**: Draft (Phase 1 / MVP)
+> **Status**: In progress. Canvas path shipped (PNG/JPG/WebP, resize, quality, batch/ZIP); AVIF/JXL via jSquash pending.
 > **Last updated**: 2026-05-21
 > **Coverage**: Formats, Engine contract, Business rules, Options, Threading, UI, Edge cases, Testing
 > **Environment**: browser (also runs in desktop build unchanged)

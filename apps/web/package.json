@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@toolzy/engine": "workspace:*",
+    "comlink": "^4.4.2",
+    "fflate": "^0.8.2",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
