@@ -16,7 +16,10 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 # Native image pipeline. `image` covers png/jpg/gif/bmp/tiff/ico (decode+encode) and
 # webp/avif decode; `webp` adds lossy webp *encoding* (libwebp).
 image = "0.25"
