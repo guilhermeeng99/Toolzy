@@ -24,10 +24,10 @@ app/
 
 ## Develop
 
-Standalone project (not in a pnpm workspace) — install with `--ignore-workspace`:
+Standalone single-project pnpm root:
 
 ```bash
-pnpm install --ignore-workspace
+pnpm install
 node scripts/fetch-binaries.mjs   # yt-dlp (auto); prints where to put ffmpeg + pdfium
 pnpm tauri dev                    # run the desktop app
 ```

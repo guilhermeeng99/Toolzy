@@ -14,7 +14,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.0.8
 
       - uses: actions/setup-node@v4
         with:
@@ -25,12 +25,12 @@ jobs:
 
       - name: Build app (typecheck + Vite)
         run: |
-          pnpm -C app install --ignore-workspace
+          pnpm -C app install
           pnpm -C app build
 
       - name: Build site (Vite)
         run: |
-          pnpm -C site install --ignore-workspace
+          pnpm -C site install
           pnpm -C site build
 
   # Rust (cargo test) runs locally / on release builds: it needs the Tauri Linux

@@ -130,7 +130,7 @@ Rules:
 | Media | native `ffmpeg` via Tauri sidecar |
 | Download | `yt-dlp` via Tauri sidecar |
 | Dialogs / drag-drop | `@tauri-apps/plugin-dialog` + webview drag-drop (native paths) |
-| Package manager | pnpm — `app/` and `site/` are standalone (`--ignore-workspace`) |
+| Package manager | pnpm — `app/` and `site/` are standalone single-project roots |
 | Lint / format | Biome |
 | Tests | `cargo test` (Rust) · Vitest/Playwright not used (UI is thin) |
 | i18n | English only (not planned) |
@@ -141,7 +141,7 @@ Rules:
 
 ```bash
 # app/ (the desktop app) — standalone pnpm project
-pnpm install --ignore-workspace
+pnpm install
 pnpm tauri dev        # run the desktop app (Vite + Tauri)
 pnpm build            # tsc --noEmit + vite build
 pnpm tauri build      # installer for the current OS (needs icons + sidecar binaries)

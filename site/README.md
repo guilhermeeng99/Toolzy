@@ -6,7 +6,7 @@ Stack: **Vite + Tailwind v4** (no framework). One page, no backend.
 Standalone (not in the repo's pnpm workspace):
 
 ```bash
-pnpm install --ignore-workspace   # run inside site/
+pnpm install   # run inside site/
 pnpm dev                          # local preview
 pnpm build                        # static output → dist/
 ```

@@ -85,7 +85,7 @@ See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the rationale
 
 ```bash
 cd app
-pnpm install --ignore-workspace
+pnpm install
 node scripts/fetch-binaries.mjs   # downloads yt-dlp; prints where to put ffmpeg + pdfium
 pnpm tauri dev                    # run the desktop app
 ```
@@ -104,7 +104,7 @@ pnpm tauri build                  # installer for the current OS (needs icons + 
 
 ```bash
 cd site
-pnpm install --ignore-workspace
+pnpm install
 pnpm dev      # preview · pnpm build → static dist/
 ```
 
