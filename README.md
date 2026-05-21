@@ -7,6 +7,9 @@ audio/video from a link — all on your own machine.
 **The promise:** your files never leave your device. Conversion runs **natively** (Rust +
 bundled binaries), not in a browser sandbox — fast, reliable, no upload, no account, no server.
 
+> ## 🌐 [**Website → guilhermeeng99.github.io/Toolzy**](https://guilhermeeng99.github.io/Toolzy/)
+> ⬇️ **[Download the latest release](https://github.com/guilhermeeng99/Toolzy/releases/latest)** (Windows · self-updating)
+
 ## What it does
 
 Status: ✅ done · 🚧 in progress · ⬜ planned. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
