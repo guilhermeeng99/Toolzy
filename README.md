@@ -136,9 +136,12 @@ tested layer (deterministic, framework-free).
 
 ## Deploy
 
-- **Web** → Cloudflare Pages. Static export (`apps/web`), pushed by GitHub Actions on
-  `main`. Required headers `COOP`/`COEP` are set via `_headers` so threaded WASM
-  (`SharedArrayBuffer`) works.
+- **Web** → Cloudflare Pages. Two options:
+  1. **Dashboard (recommended):** connect the GitHub repo in Cloudflare Pages with build
+     command `pnpm build`, output directory `apps/web/out`, and `NODE_VERSION=20`.
+  2. **Actions + wrangler:** add `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets and
+     a deploy job. CI (`.github/workflows/ci.yml`) already lints, typechecks, and builds on
+     every push/PR. `COOP`/`COEP` ship via `public/_headers` for threaded WASM.
 - **Desktop** → GitHub Releases. CI builds installers per OS and attaches them to the tag.
 
 ## Contributing
