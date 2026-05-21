@@ -16,5 +16,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
-# Native image pipeline (pure Rust, compiled in — no external binary).
+# Native image pipeline. `image` covers png/jpg/gif/bmp/tiff/ico (decode+encode) and
+# webp/avif decode; `webp` adds lossy webp *encoding* (libwebp).
 image = "0.25"
+webp = "0.3"

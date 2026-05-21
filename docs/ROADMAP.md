@@ -23,8 +23,9 @@ removed and ADR-001/003 are rewritten.
   (Vite+React+TS+Tailwind+Tauri 2); native `convert_image` (Rust `image` crate: png/jpg +
   resize/quality); resize/naming logic ported with `cargo test` (7 green). Verified: tsc,
   vite build, cargo test.
-- ⬜ **B — Image full**: webp (libwebp), AVIF (`ravif`), JPEG-XL (`jpegxl-rs`); batch +
-  native drag-drop; before/after size + delta.
+- 🚧 **B — Image full**: ✅ webp (libwebp) + gif/bmp/tiff; ✅ batch (multi-file) + native
+  OS drag-drop; ✅ before/after size + delta. ⬜ AVIF (`ravif`/rav1e) + JPEG-XL
+  (`jpegxl-rs`/libjxl) deferred — heavy native encoders (rav1e/libjxl toolchains).
 - ⬜ **C — PDF native**: PDF→image via `pdfium-render`; image(s)→PDF via `printpdf`.
 - ⬜ **D — Media + downloader native**: ffmpeg sidecar (MP4→MP3, video); yt-dlp sidecar
   downloader (port `download_media`, keep `--ffmpeg-location`).

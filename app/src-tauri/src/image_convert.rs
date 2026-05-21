@@ -118,5 +118,9 @@ mod tests {
             output_path(Path::new("/a/b/photo.png"), "jpg"),
             PathBuf::from("/a/b/photo.jpg")
         );
+        assert_eq!(
+            output_path(Path::new("/a/b/photo.png"), "webp"),
+            PathBuf::from("/a/b/photo.webp")
+        );
     }
 }
