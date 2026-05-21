@@ -1,0 +1,10 @@
+# Normalize line endings to LF in the repo (Biome formats to LF; keeps Windows
+# checkouts from reintroducing CRLF and tripping `biome ci`).
+* text=auto eol=lf
+
+# Binary assets — never touch.
+*.png binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary

@@ -30,8 +30,9 @@ removed and ADR-001/003 are rewritten.
   downloader (port `download_media`, keep `--ffmpeg-location`).
 - ⬜ **E — Cutover**: delete `apps/web`, `packages/*`, Turborepo, workspace; rewrite
   ADR-001/003 (desktop-first); single-app CI (Rust `cargo test` + front-end build).
-- ⬜ **F — Landing site**: minimal static page (`site/`) presenting the app + download links
-  to GitHub Releases. **Do after the app is done.**
+- ✅ **F — Landing site**: static page (`site/`, Vite + Tailwind) presenting the app + a
+  download CTA to GitHub Releases. Built early at the owner's request; point the download
+  link at real installer assets once published, and wire a Pages deploy.
 
 ---
 
