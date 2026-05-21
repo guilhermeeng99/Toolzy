@@ -6,6 +6,8 @@ const nextConfig = {
   images: { unoptimized: true },
   // We lint with Biome, not ESLint; don't fail the build on a missing ESLint config.
   eslint: { ignoreDuringBuilds: true },
+  // Engine ships as TypeScript source; let Next transpile it from the workspace.
+  transpilePackages: ["@toolzy/engine"],
 };
 
 export default nextConfig;

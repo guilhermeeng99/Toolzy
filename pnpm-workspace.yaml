@@ -3,4 +3,6 @@ packages:
   - "packages/*"
 allowBuilds:
   '@biomejs/biome': true
+  esbuild: true
   sharp: false
+  turbo: true
