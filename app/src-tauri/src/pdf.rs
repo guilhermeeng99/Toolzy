@@ -1,25 +1,39 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use pdfium_render::prelude::*;
+use tauri::Manager;
 
-/// Locate and bind the pdfium library: prefer a copy shipped beside the
-/// executable, fall back to a system install.
-fn bind_pdfium() -> Result<Pdfium, String> {
-    let dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(Path::to_path_buf))
-        .unwrap_or_default();
-    let bindings = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir))
-        .or_else(|_| Pdfium::bind_to_system_library())
-        .map_err(|e| format!("pdfium library not found: {e}"))?;
-    Ok(Pdfium::new(bindings))
+/// Locate and bind the pdfium library, trying (in order): the bundled resource
+/// dir, the executable's own dir (dev / portable), then a system install.
+fn bind_pdfium(app: &tauri::AppHandle) -> Result<Pdfium, String> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Ok(res) = app.path().resource_dir() {
+        dirs.push(res.join("pdfium"));
+        dirs.push(res);
+    }
+    if let Some(parent) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
+        dirs.push(parent);
+    }
+    for dir in dirs {
+        if let Ok(b) = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir)) {
+            return Ok(Pdfium::new(b));
+        }
+    }
+    Pdfium::bind_to_system_library()
+        .map(Pdfium::new)
+        .map_err(|e| format!("pdfium library not found: {e}"))
 }
 
 /// Render each PDF page to an image (png | jpg) next to the source file and
 /// return the saved paths. `scale` (1..4) controls resolution.
 #[tauri::command]
-pub fn pdf_to_images(path: String, format: String, scale: Option<f32>) -> Result<Vec<String>, String> {
-    let pdfium = bind_pdfium()?;
+pub fn pdf_to_images(
+    app: tauri::AppHandle,
+    path: String,
+    format: String,
+    scale: Option<f32>,
+) -> Result<Vec<String>, String> {
+    let pdfium = bind_pdfium(&app)?;
     let src = Path::new(&path);
     let doc = pdfium
         .load_pdf_from_file(src, None)

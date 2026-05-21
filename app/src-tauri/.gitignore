@@ -1,4 +1,5 @@
 /target
 /gen/schemas
 /binaries
-/lib
+/pdfium
+/.fetch-tmp

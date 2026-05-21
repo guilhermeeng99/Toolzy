@@ -1,0 +1,127 @@
+name: Release
+
+# On every push to main: run CI, then bump the patch version, tag, build the
+# Windows installer (binaries bundled), and publish a GitHub Release. PRs run CI
+# only. The release job skips the bot's own bump commit (`chore(release):`).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: ci (lint · build)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Lint + format (Biome)
+        run: pnpm dlx @biomejs/biome@1.9.4 ci .
+
+      - name: Build app (typecheck + Vite)
+        run: |
+          pnpm -C app install
+          pnpm -C app build
+
+      - name: Build site (Vite)
+        run: |
+          pnpm -C site install
+          pnpm -C site build
+
+  release:
+    name: bump · build · publish
+    runs-on: windows-latest
+    needs: [ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore(release):')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version
+        id: bump
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(jq -r .version app/src-tauri/tauri.conf.json)
+          IFS=. read -r major minor patch <<< "$current"
+          next="${major}.${minor}.$((patch + 1))"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          tmp=$(mktemp)
+          jq --arg v "$next" '.version = $v' app/src-tauri/tauri.conf.json > "$tmp"
+          mv "$tmp" app/src-tauri/tauri.conf.json
+          sed -i -E "0,/^version = \".*\"$/ s//version = \"$next\"/" app/src-tauri/Cargo.toml
+          echo "bumped $current -> $next"
+
+      - name: Commit, tag, push
+        shell: bash
+        run: |
+          set -euo pipefail
+          next="${{ steps.bump.outputs.next }}"
+          git add app/src-tauri/tauri.conf.json app/src-tauri/Cargo.toml
+          git commit -m "chore(release): v${next} [skip ci]"
+          git tag "v${next}"
+          git push origin main
+          git push origin "v${next}"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - name: Install app dependencies
+        run: pnpm -C app install
+
+      - name: Fetch bundled binaries (yt-dlp, ffmpeg, pdfium)
+        run: node app/scripts/fetch-binaries.mjs
+
+      - name: Build & publish installer
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: app
+          tagName: v${{ steps.bump.outputs.next }}
+          releaseName: 'Toolzy v${{ steps.bump.outputs.next }}'
+          releaseBody: |
+            Auto-released from `main` @ ${{ github.sha }}.
+
+            Download the installer (`.exe` NSIS or `.msi`) for Windows and run it. ffmpeg,
+            yt-dlp and pdfium are bundled — nothing else to download.
+
+            > **First install:** Toolzy is unsigned, so Windows SmartScreen may warn
+            > "Unrecognized app". Click **More info → Run anyway**.
+          releaseDraft: false
+          prerelease: false
