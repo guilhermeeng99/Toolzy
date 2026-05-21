@@ -29,8 +29,11 @@ removed and ADR-001/003 are rewritten.
 - ✅ **C — PDF native**: PDF→image via `pdfium-render` (`pdf_to_images`); image(s)→PDF via
   `printpdf` (`images_to_pdf`). Two-mode PDF UI; shared `ui.tsx` (Card/Field/Slider/pill/…).
   Runtime needs the pdfium library beside the exe (added in Phase D's binaries step).
-- ⬜ **D — Media + downloader native**: ffmpeg sidecar (MP4→MP3, video); yt-dlp sidecar
-  downloader (port `download_media`, keep `--ffmpeg-location`).
+- ✅ **D — Media + downloader native**: `convert_media` (ffmpeg sidecar: mp3/m4a/wav,
+  batch + drag-drop) and `download_media` (yt-dlp sidecar, `--ffmpeg-location`, prints final
+  path; cargo-tested arg builder). tauri-plugin-shell + `externalBin` + shell capability;
+  `scripts/fetch-binaries.mjs` (yt-dlp auto, ffmpeg/pdfium manual). Media + Download UI in
+  the app nav. _Runtime needs the sidecar binaries — verify on a real build._
 - ⬜ **E — Cutover + full docs refresh** (owner request: this is the **final step**, after
   B–D are done — a general review that updates every doc and removes all dead code/files):
   - **Remove superseded web/monorepo files**: `apps/web`, the old `apps/desktop` Tauri shell,

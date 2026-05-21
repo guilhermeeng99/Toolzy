@@ -1,13 +1,17 @@
 import { useState } from "react";
+import { DownloadTool } from "./components/DownloadTool";
 import { ImageTool } from "./components/ImageTool";
+import { MediaTool } from "./components/MediaTool";
 import { PdfTool } from "./components/PdfTool";
 import { pill } from "./components/ui";
 
-type Tool = "image" | "pdf";
+type Tool = "image" | "pdf" | "media" | "download";
 
 const TOOLS: { id: Tool; label: string }[] = [
   { id: "image", label: "Image" },
   { id: "pdf", label: "PDF" },
+  { id: "media", label: "Media" },
+  { id: "download", label: "Download" },
 ];
 
 const TOOL_META: Record<Tool, { title: string; description: string }> = {
@@ -19,7 +23,22 @@ const TOOL_META: Record<Tool, { title: string; description: string }> = {
     title: "PDF tools",
     description: "Render PDF pages to images, or combine images into a PDF — all native.",
   },
+  media: {
+    title: "Media converter",
+    description: "Extract or convert audio from your files, like MP4 to MP3 — native ffmpeg.",
+  },
+  download: {
+    title: "Media downloader",
+    description: "Save audio and video from a link as MP4 or MP3, on your own connection.",
+  },
 };
+
+function ToolView({ tool }: { tool: Tool }) {
+  if (tool === "image") return <ImageTool />;
+  if (tool === "pdf") return <PdfTool />;
+  if (tool === "media") return <MediaTool />;
+  return <DownloadTool />;
+}
 
 export function App() {
   const [tool, setTool] = useState<Tool>("image");
@@ -53,7 +72,7 @@ export function App() {
           <h1 className="text-display-sm font-bold text-midnight-indigo">{meta.title}</h1>
           <p className="mx-auto mt-3 max-w-xl text-body-lg text-slate-blue">{meta.description}</p>
         </header>
-        {tool === "image" ? <ImageTool /> : <PdfTool />}
+        <ToolView tool={tool} />
       </main>
     </div>
   );

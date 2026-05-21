@@ -4,7 +4,9 @@ use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat, ImageReader};
 use serde::{Deserialize, Serialize};
 
+mod download;
 mod image_convert;
+mod media;
 mod pdf;
 mod pdf_build;
 
@@ -101,10 +103,13 @@ fn save(img: &DynamicImage, format: ImageFormat, out: &Path) -> Result<(), Strin
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             convert_image,
             pdf::pdf_to_images,
-            pdf_build::images_to_pdf
+            pdf_build::images_to_pdf,
+            media::convert_media,
+            download::download_media
         ])
         .run(tauri::generate_context!())
         .expect("error while running Toolzy");
