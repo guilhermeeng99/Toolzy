@@ -1,0 +1,20 @@
+{
+  "name": "toolzy",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@11.0.8",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @toolzy/web dev",
+    "build": "pnpm --filter @toolzy/web build",
+    "start": "pnpm --filter @toolzy/web start",
+    "typecheck": "pnpm --filter @toolzy/web typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4"
+  }
+}
