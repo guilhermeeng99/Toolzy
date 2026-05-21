@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/copy-pdf-worker.mjs && next dev",
+    "build": "node scripts/copy-pdf-worker.mjs && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
@@ -13,6 +13,8 @@
     "comlink": "^4.4.2",
     "fflate": "^0.8.2",
     "next": "^15.1.6",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.7.76",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

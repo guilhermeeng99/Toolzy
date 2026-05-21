@@ -17,7 +17,7 @@
 |---|---|---|
 | Phase 0 | Foundation (docs, scaffold, CI/deploy) | 🚧 In progress |
 | Phase 1 | Image: convert · compress · resize | 🚧 In progress |
-| Phase 2 | PDF ⇄ image | ⬜ Planned |
+| Phase 2 | PDF ⇄ image | ✅ Done |
 | Phase 3 | Media convert (own files) | ⬜ Planned |
 | Phase 4 | Desktop app + media downloader | ⬜ Planned |
 
@@ -80,11 +80,12 @@ from a Worker with one trivial converter wired end-to-end.
 **Exit criteria:** drag image(s) → pick target/quality/size → download, fully client-side,
 off-main-thread, with the format matrix in the spec covered by tests.
 
-### Phase 2 — PDF ⇄ image · spec: `specs/pdf-tools.md` (to be written)
-- ⬜ PDF → images (per page, choose DPI/format) via `pdfjs-dist`.
-- ⬜ Image(s) → PDF (order, page size, margins) via `pdf-lib`.
-- ⬜ Merge images into a single multi-page PDF.
-- 💡 PDF page operations (reorder/rotate/delete) — evaluate after the above.
+### Phase 2 — PDF ⇄ image · spec: [`pdf-tools.md`](specs/pdf-tools.md)
+- ✅ PDF to images (per page, choose PNG/JPG and scale) via `pdfjs-dist`.
+- ✅ Images to PDF (reorder, page size fit/A4/Letter) via `pdf-lib`.
+- ✅ Multi-page PDF from many images; page grid with per-page and ZIP download.
+- ✅ Tool page at `/tools/pdf` (tabbed), linked from the landing grid.
+- 💡 PDF page operations (rotate/delete/compress/split): evaluate later.
 
 ### Phase 3 — Media convert (own files) · spec: `specs/media-convert.md` (to be written)
 - ⬜ MP4 → MP3 (audio extract) and common A/V format conversions via `ffmpeg.wasm`.

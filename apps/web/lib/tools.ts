@@ -36,9 +36,9 @@ export const TOOLS: ToolMeta[] = [
     slug: "pdf-to-image",
     name: "PDF and image",
     description: "Turn PDF pages into images, or merge images into a PDF.",
-    href: "#",
+    href: "/tools/pdf",
     icon: "file",
-    status: "soon",
+    status: "live",
     env: "browser",
   },
   {

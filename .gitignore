@@ -6,6 +6,9 @@ node_modules/
 .next/
 out/
 
+# generated at build time (copied from node_modules)
+apps/web/public/pdf.worker.min.mjs
+
 # build / cache
 dist/
 .turbo/

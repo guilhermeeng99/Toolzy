@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
+import { downloadZip, triggerDownload } from "@/lib/download";
 import { formatBytes, sizeDelta } from "@/lib/format";
 import type { ImageWorkerApi } from "@/lib/workers/image.worker";
 import {
@@ -145,18 +146,10 @@ export function ImageTool() {
   }
 
   async function downloadAll() {
-    const done = itemsRef.current.filter((i) => i.status === "done");
-    if (done.length === 0) return;
-    const taken = new Set<string>();
-    const entries: Record<string, Uint8Array> = {};
-    for (const i of done) {
-      if (!i.output) continue;
-      entries[uniqueName(i.output.filename, taken)] = new Uint8Array(
-        await i.output.blob.arrayBuffer(),
-      );
-    }
-    const { zipSync } = await import("fflate");
-    triggerDownload(new Blob([zipSync(entries)], { type: "application/zip" }), "toolzy-images.zip");
+    const files = itemsRef.current.flatMap((i) =>
+      i.output ? [{ name: i.output.filename, blob: i.output.blob }] : [],
+    );
+    if (files.length > 0) await downloadZip(files, "toolzy-images.zip");
   }
 
   return (
@@ -372,33 +365,4 @@ function NumberInput({
       className="w-28 rounded-lg border border-platinum-tint bg-snow-white px-3 py-1.5 text-body-lg text-midnight-indigo focus-visible:border-action-blue focus-visible:outline-none"
     />
   );
-}
-
-function triggerDownload(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function uniqueName(name: string, taken: Set<string>): string {
-  if (!taken.has(name)) {
-    taken.add(name);
-    return name;
-  }
-  const dot = name.lastIndexOf(".");
-  const base = dot === -1 ? name : name.slice(0, dot);
-  const ext = dot === -1 ? "" : name.slice(dot);
-  let n = 1;
-  let candidate = `${base} (${n})${ext}`;
-  while (taken.has(candidate)) {
-    n += 1;
-    candidate = `${base} (${n})${ext}`;
-  }
-  taken.add(candidate);
-  return candidate;
 }
