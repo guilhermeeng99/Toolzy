@@ -5,6 +5,8 @@ node_modules/
 # build / cache
 dist/
 .vite/
+.next/
+out/
 *.tsbuildinfo
 
 # rust / tauri (also covered by app/src-tauri/.gitignore)
