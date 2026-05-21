@@ -28,8 +28,17 @@ removed and ADR-001/003 are rewritten.
 - ⬜ **C — PDF native**: PDF→image via `pdfium-render`; image(s)→PDF via `printpdf`.
 - ⬜ **D — Media + downloader native**: ffmpeg sidecar (MP4→MP3, video); yt-dlp sidecar
   downloader (port `download_media`, keep `--ffmpeg-location`).
-- ⬜ **E — Cutover**: delete `apps/web`, `packages/*`, Turborepo, workspace; rewrite
-  ADR-001/003 (desktop-first); single-app CI (Rust `cargo test` + front-end build).
+- ⬜ **E — Cutover + full docs refresh** (owner request: this is the **final step**, after
+  B–D are done — a general review that updates every doc and removes all dead code/files):
+  - **Remove superseded web/monorepo files**: `apps/web`, the old `apps/desktop` Tauri shell,
+    `packages/engine`, `packages/config`, `turbo.json`, root `pnpm-workspace.yaml`, root web
+    configs, `apps/web/public/_headers`, the web `vitest.config.ts`, and any other dead code/
+    assets left from the web build. Grep for references to removed paths before deleting.
+  - **Refresh ALL docs** to the desktop-native reality: `README.md`, `CLAUDE.md`, every
+    `docs/specs/*` (rewrite ADR-001/003 desktop-first; update architecture, image/pdf/
+    media/download, design-system) and this ROADMAP.
+  - **Single-app CI**: Rust `cargo test` + front-end build + `biome`; site deploy workflow.
+  - **Verify**: nothing references removed paths; build/lint/test green.
 - ✅ **F — Landing site**: static page (`site/`, Vite + Tailwind) presenting the app + a
   download CTA to GitHub Releases. Built early at the owner's request; point the download
   link at real installer assets once published, and wire a Pages deploy.
