@@ -1,6 +1,7 @@
 # Cloudflare Pages headers.
-# COOP/COEP enable SharedArrayBuffer → threaded WASM (ffmpeg.wasm, etc.).
-# See docs/specs/architecture.md → "COOP/COEP headers".
+# COOP/COEP enable SharedArrayBuffer → threaded WASM. The current ffmpeg core is
+# single-thread (works without COEP); these are set ahead of a future threaded core.
+# All app assets are same-origin, so require-corp is safe. See architecture.md.
 /*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp

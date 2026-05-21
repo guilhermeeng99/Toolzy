@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { registerBuiltins } from "./builtins";
 import { ConverterRegistry } from "./registry";
 import { ok } from "./result";
 import type { Converter } from "./types";
@@ -43,5 +44,20 @@ describe("ConverterRegistry", () => {
     const browser = r.list("browser").map((c) => c.id);
     expect(browser).toContain("browser-only");
     expect(browser).not.toContain("desktop-only");
+  });
+});
+
+describe("registerBuiltins", () => {
+  it("registers the image converter into a fresh registry", () => {
+    const r = new ConverterRegistry();
+    registerBuiltins(r);
+    expect(r.has("image")).toBe(true);
+    expect(r.get("image")?.environment).toBe("both");
+  });
+
+  it("is idempotent (safe to call more than once)", () => {
+    const r = new ConverterRegistry();
+    registerBuiltins(r);
+    expect(() => registerBuiltins(r)).not.toThrow();
   });
 });

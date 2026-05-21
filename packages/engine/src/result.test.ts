@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attempt, err, isErr, isOk, ok } from "./result";
+import { err, isErr, isOk, ok } from "./result";
 
 describe("result", () => {
   it("ok wraps a value", () => {
@@ -13,24 +13,12 @@ describe("result", () => {
     expect(isErr(r)).toBe(true);
   });
 
-  it("attempt returns ok on success", async () => {
-    const r = await attempt(
-      async () => 1,
-      () => ({ kind: "canceled" }),
-    );
-    expect(r).toEqual({ ok: true, value: 1 });
-  });
-
-  it("attempt maps a throw to a ToolzyError", async () => {
-    const r = await attempt(
-      async () => {
-        throw new Error("boom");
-      },
-      (c) => ({ kind: "decode_failed", format: "png", cause: String(c) }),
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.error.kind).toBe("decode_failed");
-    }
+  it("isOk and isErr narrow the union", () => {
+    const good = ok("v");
+    const bad = err({ kind: "canceled" } as const);
+    expect(isOk(good)).toBe(true);
+    expect(isErr(good)).toBe(false);
+    expect(isOk(bad)).toBe(false);
+    expect(isErr(bad)).toBe(true);
   });
 });

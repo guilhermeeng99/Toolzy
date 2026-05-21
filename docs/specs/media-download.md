@@ -41,14 +41,16 @@ async fn download_media(app: AppHandle, url: String, format: String) -> Result<S
 ```
 
 - Validates `url` is http(s).
-- Resolves the Downloads dir via `tauri_plugin_path`.
+- Resolves the Downloads dir via Tauri's path API (`app.path().download_dir()`).
 - Spawns the `yt-dlp` sidecar (via `tauri-plugin-shell`) with `--ffmpeg-location` pointing at
-  the bundled `ffmpeg` sidecar, and `-P <downloads>` plus an output template.
-- Returns the final file path on success, or a message on non-zero exit.
+  the bundled `ffmpeg` (the executable's own directory, where sidecars ship) and
+  `-o <downloads>/%(title)s.%(ext)s`.
+- Returns the final, post-processed file path on success (`--print after_move:filepath`,
+  falling back to the Downloads folder), or the stderr tail on non-zero exit.
 
 `yt-dlp` and `ffmpeg` are declared as `externalBin` in `tauri.conf.json` and placed in
-`apps/desktop/src-tauri/binaries/` (per-target-triple suffix), fetched by
-`scripts/fetch-binaries.mjs`.
+`apps/desktop/src-tauri/binaries/` (per-target-triple suffix). `scripts/fetch-binaries.mjs`
+downloads `yt-dlp` and prints where to fetch the matching `ffmpeg`.
 
 ---
 

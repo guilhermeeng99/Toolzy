@@ -1,8 +1,8 @@
 "use client";
 
+import { pillClass } from "@/components/tools/controls";
 import { ImagesToPdf } from "@/components/tools/images-to-pdf";
 import { PdfToImages } from "@/components/tools/pdf-to-images";
-import { cn } from "@/lib/cn";
 import { useState } from "react";
 
 type Mode = "to-images" | "to-pdf";
@@ -35,16 +35,7 @@ function Tab({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-lg px-5 py-2 text-body-lg font-semibold transition-colors",
-        active
-          ? "bg-action-blue text-snow-white"
-          : "bg-pale-gray text-midnight-indigo hover:bg-platinum-tint",
-      )}
-    >
+    <button type="button" onClick={onClick} className={pillClass(active, "px-5 py-2 text-body-lg")}>
       {children}
     </button>
   );

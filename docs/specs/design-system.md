@@ -92,9 +92,10 @@ buttons) · `font-bold` 700 (display headlines). Letter spacing: normal.
 
 ## 4. Spacing
 
-Base unit **8px**. Tokens: `8 16 24 32 40 48 56 64 72 96` → Tailwind `p-*`, `gap-*`,
-`m-*` etc. (e.g. `--spacing-24` → `p-24`). Layout rhythm: **section gap 40px**
-(`gap-40` / `py-40`-ish per section), element gap 8px.
+Base unit **8px**. Tailwind v4's default spacing scale already is a 4/8px grid, so we use the
+stock utilities — there are **no custom `--spacing-*` tokens** (note: Tailwind's `p-24` = 96px,
+not 24px). Values in actual use: container padding `px-6` (24px), section rhythm `py-12`/`py-16`,
+card and grid gaps `gap-6`. Stay on the scale to keep the 8px feel.
 
 ---
 
@@ -160,9 +161,9 @@ underline or color shift on hover.
 - **Container**: max-width centered (~1200px), horizontal padding responsive
   (`px-24` desktop / `px-16` mobile). Background `snow-white`; alternating sections may use
   `cloud-mist`.
-- **Header**: sticky top bar, `bg-snow-white`, hairline `border-b border-outline-gray`.
-  Logo left · nav · right-aligned actions (a ghost link + a primary CTA — for Toolzy the CTA
-  is "Get the desktop app").
+- **Header**: sticky top bar, `bg-snow-white/90` + backdrop blur, hairline
+  `border-b border-outline-gray`. Currently **minimal — just the Toolzy logo** (left). Nav and
+  a right-aligned CTA ("Get the desktop app") can return once there are more destinations.
 - **Hero**: large centered (or left) headline (`text-display-lg`, `font-bold`,
   `text-midnight-indigo`), supporting paragraph (`text-subheading`, `text-slate-blue`), a
   primary CTA, optionally a floating product card with abstract accent shapes behind it.

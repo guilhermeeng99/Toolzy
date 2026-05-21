@@ -12,7 +12,7 @@ Toolzy is a **client-side application with no backend**. The same frontend ships
 ```
             ┌────────────────────────────┐
             │      apps/web (Next.js)     │  ← single frontend codebase
-            │  React UI · registry-driven │
+            │  React UI · engine-driven   │
             └─────────────┬──────────────┘
                           │ calls
             ┌─────────────▼──────────────┐
@@ -33,8 +33,12 @@ Toolzy is a **client-side application with no backend**. The same frontend ships
 - **Desktop build**: Tauri wraps the identical web UI and unlocks `environment: 'desktop'`
   converters that shell out to native binaries.
 
-The registry (`packages/engine`) is the seam: the UI renders whatever converters are
-registered and permitted in the current environment. No forked UIs.
+The engine (`packages/engine`) is the seam. True 1:1 conversions implement `Converter` and
+register in the `ConverterRegistry` (the catalog used for discovery + environment gating);
+1→N / N→1 and runtime-coupled tools (PDF, media) are dedicated `Result`-returning functions.
+Codecs that are bundler/asset-coupled (`pdfjs-dist`, `pdf-lib`, `@ffmpeg/*`) run in thin
+wrappers under `apps/web/lib`, still behind the engine's types. One UI, environment-gated at
+runtime — no forked UIs.
 
 ---
 
@@ -146,8 +150,10 @@ no throwing for expected failures. `ToolzyError` is a sealed union extended cent
 ## Cross-cutting concerns
 
 ### Threading
-Browser conversions run in a **Web Worker** (Comlink-wrapped) so the main thread never
-blocks. The engine is worker-agnostic; the worker is an adapter the UI injects.
+Image conversion runs in a **Web Worker** (Comlink-wrapped) so the main thread never blocks;
+the engine is worker-agnostic and the worker is an adapter the UI injects. PDF and media
+currently run on the main thread — `pdfjs-dist` and `ffmpeg.wasm` spin their own internal
+workers — which is acceptable for V1 (a dedicated worker can come later).
 
 ### Sidecars
 Desktop native features are Tauri **sidecars** — `yt-dlp` and `ffmpeg` shipped as separate

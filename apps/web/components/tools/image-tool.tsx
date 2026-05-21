@@ -1,11 +1,11 @@
 "use client";
 
+import { Field, pillClass } from "@/components/tools/controls";
 import { Dropzone } from "@/components/tools/dropzone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/cn";
 import { downloadZip, triggerDownload } from "@/lib/download";
 import { formatBytes, sizeDelta } from "@/lib/format";
 import type { ImageWorkerApi } from "@/lib/workers/image.worker";
@@ -163,12 +163,7 @@ export function ImageTool() {
                 key={t}
                 type="button"
                 onClick={() => setTarget(t)}
-                className={cn(
-                  "rounded-lg px-4 py-1.5 text-body-lg font-semibold uppercase transition-colors",
-                  target === t
-                    ? "bg-action-blue text-snow-white"
-                    : "bg-pale-gray text-midnight-indigo hover:bg-platinum-tint",
-                )}
+                className={pillClass(target === t, "px-4 py-1.5 text-body-lg uppercase")}
               >
                 {t}
               </button>
@@ -201,12 +196,7 @@ export function ImageTool() {
                 key={m}
                 type="button"
                 onClick={() => setResizeMode(m)}
-                className={cn(
-                  "rounded-lg px-4 py-1.5 text-body font-semibold capitalize transition-colors",
-                  resizeMode === m
-                    ? "bg-action-blue text-snow-white"
-                    : "bg-pale-gray text-midnight-indigo hover:bg-platinum-tint",
-                )}
+                className={pillClass(resizeMode === m, "px-4 py-1.5 text-body capitalize")}
               >
                 {m === "none" ? "Original size" : m}
               </button>
@@ -331,17 +321,6 @@ function FileRow({
         </button>
       </div>
     </Card>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="mb-2 text-body font-semibold uppercase tracking-wide text-slate-blue">
-        {label}
-      </p>
-      {children}
-    </div>
   );
 }
 

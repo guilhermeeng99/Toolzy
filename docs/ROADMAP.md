@@ -15,8 +15,8 @@
 
 | Phase | Theme | Status |
 |---|---|---|
-| Phase 0 | Foundation (docs, scaffold, CI/deploy) | 🚧 In progress |
-| Phase 1 | Image: convert · compress · resize | 🚧 In progress |
+| Phase 0 | Foundation (docs, scaffold, engine, CI) | ✅ Done |
+| Phase 1 | Image: convert · compress · resize | 🚧 In progress (Canvas shipped; AVIF/JXL pending) |
 | Phase 2 | PDF ⇄ image | ✅ Done |
 | Phase 3 | Media convert (own files) | ✅ Done |
 | Phase 4 | Desktop app + media downloader | 🚧 In progress |
@@ -52,16 +52,16 @@
 
 ## 🚧 In progress
 
-### Phase 0 — Foundation (remaining)
-- ⬜ `packages/engine`: `Converter` interface, registry, `Result`/`ToolzyError` types,
-  Web Worker bridge (Comlink). _(Add Turborepo when this lands.)_
-- ⬜ Test tooling: Vitest (unit) + Playwright (e2e) wired with a smoke test.
-- ⬜ CI: GitHub Actions → build + lint + test; deploy static export to Cloudflare Pages on
-  `main` (`_headers` COOP/COEP already in place).
-- ⬜ Repo init: `git init`, MIT `LICENSE`, push to GitHub.
+### Phase 0 — Foundation
+- ✅ `packages/engine`: `Converter` interface, registry (`registerBuiltins`), `Result`/
+  `ToolzyError` types, Web Worker bridge (Comlink). Turborepo wired.
+- ✅ Test tooling: Vitest (unit) wired; engine + app helpers covered. _(Playwright e2e: planned.)_
+- ✅ CI: GitHub Actions → lint + typecheck + test + build on push/PR. _(Cloudflare deploy job:
+  dashboard-connected; Actions deploy optional — see README.)_
+- ✅ Repo init: `git init`, MIT `LICENSE`, pushed to GitHub.
 
-**Exit criteria:** site deployed on Cloudflare Pages, green CI, the engine registry callable
-from a Worker with one trivial converter wired end-to-end.
+**Exit criteria (met):** green CI; the image converter wired end-to-end (registry →
+Worker → Canvas → download). Cloudflare deploy is dashboard-driven.
 
 ---
 
@@ -102,9 +102,11 @@ off-main-thread, with the format matrix in the spec covered by tests.
 - ✅ Tauri v2 scaffold (`apps/desktop`, outside the pnpm workspace so CI/web ignore it):
   config, Rust `download_media` command (yt-dlp sidecar), capabilities, `fetch-binaries`
   script, build docs.
+- ✅ `download_media` points yt-dlp at the bundled ffmpeg via `--ffmpeg-location` and returns
+  the final file path (`--print after_move:filepath`).
 - ⬜ First local build: generate icons, fetch sidecars, run `pnpm desktop:build` (needs the
   Rust toolchain). Not run in this environment.
-- ⬜ Wire `--ffmpeg-location` to the bundled ffmpeg; stream live yt-dlp progress to the UI.
+- ⬜ Stream live yt-dlp progress to the UI (V1 shows a busy state).
 - ⬜ Cross-OS installers via a CI matrix, published to GitHub Releases.
 
 ---

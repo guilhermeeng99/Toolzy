@@ -33,8 +33,9 @@ apps/
   desktop/    # Tauri v2 (Rust) shell + sidecars (yt-dlp, ffmpeg).
 packages/
   engine/     # Conversion engine (TS): image/ pdf/ media/. No React, no DOM-only deps.
-  ui/         # Shared React components (shadcn/ui based).
   config/     # Shared tsconfig + Biome config.
+              # UI primitives live in apps/web/components/ui for now; a shared
+              # packages/ui is planned only if a second app needs them.
 docs/
   specs/      # Per-feature contracts + architecture.md (ADRs).
   ROADMAP.md  # Done / doing / planned.
@@ -42,19 +43,28 @@ docs/
 
 Layer rules (Clean-Architecture spirit):
 
-- `engine` depends on nothing in `apps/` or `ui/`.
-- `apps/web` and `ui/` depend on `engine`, never the reverse.
-- Third-party codecs (`jsquash`, `wasm-vips`, `pdfjs-dist`, `pdf-lib`, `ffmpeg`) are
-  imported **only** inside `engine`, wrapped behind the `Converter` interface. UI code must
-  never import a codec directly.
+- `engine` depends on nothing in `apps/`.
+- `apps/web` depends on `engine`, never the reverse.
+- Codecs sit behind the engine's types/`Result`. Pure logic (Canvas image pipeline, ffmpeg
+  arg-building, page-size/filename math) lives in `engine`. Codecs that are
+  bundler/asset-coupled (`pdfjs-dist`, `pdf-lib`, `@ffmpeg/*`; later `@jsquash/*`,
+  `wasm-vips`) run in thin wrappers under `apps/web/lib/{pdf,media}`, still returning
+  `Result`. UI **components** never import a codec directly — they call the engine or a
+  `lib/` wrapper.
 
 ---
 
 ## The Engine & Converter Registry
 
-The architectural keystone. Every tool implements one interface and registers itself; the
-UI is **driven by the registry** (format dropdowns, option panels, environment gating are
-derived from registered converters). Adding a tool = implement `Converter` + register it.
+The engine is the seam between UI and codecs. **True 1:1 conversions** implement the
+`Converter` interface and register in the `ConverterRegistry` (via `registerBuiltins`); the
+registry is the catalog used for discovery and environment gating. **Non-1:1 tools** — PDF
+(1→N / N→1) and the bundler-coupled media runtime — are dedicated functions that return the
+same `Result`, not registry entries (see [`pdf-tools.md`](docs/specs/pdf-tools.md),
+[`media-convert.md`](docs/specs/media-convert.md)).
+
+- Adding a **1:1** tool = implement `Converter` + add it to `registerBuiltins`.
+- Adding a **1→N / N→1 or runtime-coupled** tool = a dedicated `Result`-returning function.
 
 ```ts
 // packages/engine/src/types.ts
@@ -92,7 +102,7 @@ export interface Converter<O = Record<string, unknown>> {
     file: File | Blob,
     target: string,
     options: O,
-    ctx: ConvertContext,
+    ctx?: ConvertContext,
   ): Promise<Result<ConversionOutput>>;
 }
 ```
@@ -101,8 +111,9 @@ Rules:
 
 - Converters **return** `Result`; they never throw across the boundary. Map every internal
   exception to a `ToolzyError`.
-- `environment: 'desktop'` converters must not be reachable in the web build — gate them by
-  the registry's environment filter, not by hiding a button.
+- `environment: 'desktop'` features must not be reachable in the web build — gate them by the
+  runtime capability check (`isDesktop()`) and/or the registry's environment filter, not by
+  hiding a button.
 - Long work runs in a Web Worker (browser) or a sidecar (desktop). `convert` is `async` and
   honors `ctx.signal`.
 
@@ -158,9 +169,9 @@ Rules:
 | Threading | Web Workers + Comlink |
 | Desktop | Tauri v2 (Rust) |
 | State | React hooks; Zustand only for genuinely cross-component state |
-| i18n | `next-intl` (en default, pt-BR) |
+| i18n | `next-intl` (en + pt-BR) — _planned; UI is English-only today_ |
 | Lint/format | Biome |
-| Tests | Vitest (unit) · Playwright (e2e) |
+| Tests | Vitest (unit, active) · Playwright (e2e, _planned_) |
 
 ---
 
@@ -172,10 +183,10 @@ pnpm dev              # web app dev server (apps/web)
 pnpm build            # static export of the web app
 pnpm desktop:dev      # Tauri desktop in dev
 pnpm desktop:build    # Tauri installer for current OS
-pnpm test             # Vitest unit tests
-pnpm test:e2e         # Playwright e2e
+pnpm test             # Vitest unit tests (engine + framework-free app helpers)
 pnpm lint             # Biome
 pnpm typecheck        # tsc --noEmit (strict)
+# pnpm test:e2e       # Playwright e2e — planned, not wired yet
 ```
 
 > RTK: prefix dev commands with `rtk` for token-optimized output (e.g. `rtk pnpm install`,
@@ -232,7 +243,8 @@ Options, Threading/perf, UI states, Edge cases, Testing checklist, Out of scope.
 
 ## Dependencies
 
-- Depend on abstractions, not implementations. Every codec sits behind a `Converter`.
+- Depend on abstractions, not implementations. Every codec sits behind the engine's
+  types/`Result` — a `Converter` for 1:1 tools, a dedicated function otherwise.
 - Inject dependencies (worker factory, sidecar bridge) rather than importing singletons,
   so tests can substitute them.
 - Adding a heavy WASM dep is a deliberate decision — record it in `architecture.md`.
@@ -254,10 +266,11 @@ Options, Threading/perf, UI states, Edge cases, Testing checklist, Out of scope.
 
 - Native features (`yt-dlp`, `ffmpeg`) ship as **sidecars** (separate binaries invoked as
   child processes), never linked into the app — keeps the MIT license clean.
-- Desktop-only converters declare `environment: 'desktop'`. The web build must compile and
-  run without them.
-- Sidecar failures map to `{ kind: 'sidecar_failed', ... }` with stderr captured for
-  diagnostics.
+- Desktop-only features are gated by `isDesktop()`; the web build must compile and run
+  without them. (Desktop converters may also declare `environment: 'desktop'`.)
+- Sidecar failures: the engine reserves `{ kind: 'sidecar_failed', ... }` for converters that
+  return `Result`. The current `download_media` IPC returns a curated message string (stderr
+  tail) instead — fold it into `sidecar_failed` when the downloader moves behind the engine.
 
 ---
 

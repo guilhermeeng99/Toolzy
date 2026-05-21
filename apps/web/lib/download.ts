@@ -7,7 +7,9 @@ export function triggerDownload(blob: Blob, name: string): void {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // Defer the revoke: revoking synchronously after click() cancels the download
+  // in some browsers (notably Firefox). One tick lets the navigation start.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** De-duplicate a filename within a set, e.g. "a.png" -> "a (1).png". */

@@ -25,7 +25,10 @@ the MVP that proves the architecture end-to-end (registry → Worker → WASM �
 
 ## 1. Supported Formats
 
-Decode (in) and encode (out) for V1:
+> **Shipped today:** PNG / JPG / WebP (Canvas). The AVIF and JPEG-XL rows below are the
+> **planned** target matrix (via jSquash) — not yet enabled in the build.
+
+Decode (in) and encode (out) — target design:
 
 | From ↓ \ To → | PNG | JPG | WebP | AVIF | JPEG-XL |
 |---|---|---|---|---|---|
@@ -49,6 +52,10 @@ Size cap: **`maxBytes = 100 MB`** per input file in V1 (configurable). Larger �
 ---
 
 ## 2. Engine Contract
+
+> **Status:** the Canvas path for `png`/`jpg`/`webp` is implemented. AVIF/JPEG-XL inputs &
+> outputs, jSquash decode/encode, and `pngOptimize` (OxiPNG) in the snippet below are
+> **planned**, not yet in `converter.ts`.
 
 ```ts
 // packages/engine/src/image/converter.ts

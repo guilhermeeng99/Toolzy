@@ -13,6 +13,21 @@ export function Field({ label, children }: { label: string; children: React.Reac
   );
 }
 
+/**
+ * Shared "segmented pill" styling for the selectable button groups (target
+ * format, resize mode, tabs). Callers add size/casing via `extra`; the active /
+ * inactive color logic lives here so it stays consistent across tools.
+ */
+export function pillClass(active: boolean, extra?: string): string {
+  return cn(
+    "rounded-lg font-semibold transition-colors",
+    active
+      ? "bg-action-blue text-snow-white"
+      : "bg-pale-gray text-midnight-indigo hover:bg-platinum-tint",
+    extra,
+  );
+}
+
 export function Segmented<T extends string>({
   options,
   value,
@@ -31,12 +46,7 @@ export function Segmented<T extends string>({
           key={o}
           type="button"
           onClick={() => onChange(o)}
-          className={cn(
-            "rounded-lg px-4 py-1.5 text-body font-semibold uppercase transition-colors",
-            value === o
-              ? "bg-action-blue text-snow-white"
-              : "bg-pale-gray text-midnight-indigo hover:bg-platinum-tint",
-          )}
+          className={pillClass(value === o, "px-4 py-1.5 text-body uppercase")}
         >
           {labels?.[o] ?? o}
         </button>

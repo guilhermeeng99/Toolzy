@@ -16,7 +16,9 @@ Two related tools, both fully client-side:
 - **These are not 1:1 converters.** PDF to images is one-to-many; images to PDF is
   many-to-one. They do **not** implement the `Converter` interface (which is 1:1). They are
   dedicated engine functions that still return `Result<…, ToolzyError>` and reuse the error
-  model. The registry/`Converter` stays reserved for true 1:1 conversions (image, media).
+  model. The registry/`Converter` stays reserved for true 1:1 conversions — currently just
+  the image converter. (Media is likewise a dedicated function, not a registry entry, because
+  its ffmpeg runtime is bundler-coupled — see `media-convert.md`.)
 - **Rendering runs on the main thread** in V1 (pdfjs spins its own parsing worker). Heavy
   documents are acceptable; a dedicated worker can come later.
 - **No cmap/standard-font bundling** in V1: most Latin PDFs render correctly; exotic

@@ -34,8 +34,6 @@ export function ToolCard({ tool }: { tool: ToolMeta }) {
     </Card>
   );
 
-  if (tool.href === "#") return card;
-
   return (
     <Link
       href={tool.href}

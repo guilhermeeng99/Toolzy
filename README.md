@@ -15,12 +15,13 @@ Features ship in phases (see [`docs/ROADMAP.md`](docs/ROADMAP.md)). Status legen
 
 | Feature | Status | Where it runs |
 |---|---|---|
-| Image convert (PNG ⇄ JPG ⇄ WebP ⇄ AVIF …) | ⬜ | Browser (WASM) |
-| Image compress / resize | ⬜ | Browser (WASM) |
-| PDF → image (per page) | ⬜ | Browser (WASM) |
-| Image(s) → PDF | ⬜ | Browser (WASM) |
-| Convert your own audio/video (MP4 → MP3 …) | ⬜ | Browser (`ffmpeg.wasm`) / native on desktop |
-| Download audio/video from a link (MP4 / MP3) | ⬜ | **Desktop only** (`yt-dlp` + `ffmpeg`) |
+| Image convert (PNG ⇄ JPG ⇄ WebP) | ✅ | Browser (Canvas) |
+| Image compress / resize | ✅ | Browser (Canvas) |
+| PDF → image (per page) | ✅ | Browser (`pdfjs-dist`) |
+| Image(s) → PDF | ✅ | Browser (`pdf-lib`) |
+| Convert your own audio/video (MP4 → MP3 …) | ✅ | Browser (`ffmpeg.wasm`) / native on desktop |
+| Download audio/video from a link (MP4 / MP3) | 🚧 | **Desktop only** (`yt-dlp` + `ffmpeg`) |
+| AVIF / JPEG-XL, broader image formats | ⬜ | Browser (`@jsquash/*`, `wasm-vips`) |
 
 ### Why the downloader is desktop-only
 
@@ -49,23 +50,26 @@ toolzy/
 │   └── desktop/          # Tauri v2 (Rust) shell + bundled sidecars (yt-dlp, ffmpeg)
 ├── packages/
 │   ├── engine/           # Framework-agnostic conversion engine (TS)
-│   │   ├── image/        #   image codecs (Canvas, jSquash, wasm-vips)
-│   │   ├── pdf/          #   pdf.js (read) + pdf-lib (write)
-│   │   └── media/        #   ffmpeg.wasm (web) / native bridge (desktop)
-│   ├── ui/               # Shared React components (shadcn/ui based)
+│   │   ├── image/        #   Canvas image converter (jSquash/wasm-vips planned)
+│   │   ├── pdf/          #   page-size + filename logic (pdfjs/pdf-lib runtime in apps/web/lib)
+│   │   └── media/        #   ffmpeg arg-building (ffmpeg.wasm runtime in apps/web/lib)
 │   └── config/           # Shared tsconfig / lint config
 └── docs/
     ├── specs/            # Per-feature contracts + architecture decisions
     └── ROADMAP.md        # Done / doing / planned
 ```
 
+> UI primitives live in `apps/web/components/ui` (shadcn/ui style). A shared
+> `packages/ui` is planned only if a second app needs them.
+
 Layering (Clean-Architecture spirit, adapted to TS/React):
 
-- **`packages/engine`** — pure logic. No React, no DOM assumptions beyond Web APIs.
-  Wraps every WASM/native library behind a project-owned `Converter` interface so the UI
-  never imports a third-party codec directly.
-- **`apps/web`** — presentation only. Components and hooks call the engine; the UI holds
-  no conversion logic.
+- **`packages/engine`** — pure, framework-free logic and the `Converter` contract. No
+  React, no DOM-only deps. Codecs that are bundler/asset-coupled (`ffmpeg.wasm`,
+  `pdfjs-dist`, `pdf-lib`) run in thin wrappers under `apps/web/lib`, still returning the
+  engine's `Result` — so UI **components** never import a codec directly.
+- **`apps/web`** — presentation + the codec-runtime wrappers. Components call the engine
+  (or a `lib/` wrapper); they hold no conversion logic of their own.
 - **Web Workers** run the engine off the main thread so the UI never freezes.
 - **Tauri sidecars** run native binaries (`yt-dlp`, `ffmpeg`) on the desktop build.
 
@@ -84,7 +88,7 @@ Layering (Clean-Architecture spirit, adapted to TS/React):
 | Desktop shell | Tauri v2 (Rust) |
 | Error model | `Result<T, E>` discriminated union (no throwing across boundaries) |
 | Global UI state | React hooks; Zustand only where cross-component state is real |
-| i18n | `next-intl` (en default, pt-BR) |
+| i18n | `next-intl` (en + pt-BR) — _planned; UI is English-only today_ |
 | Monorepo | pnpm workspaces + Turborepo |
 | Lint / format | Biome |
 | Tests | Vitest (unit) · Playwright (e2e) |
@@ -104,8 +108,8 @@ for new features. Full conventions live in [`CLAUDE.md`](CLAUDE.md).
 
 ## Running locally
 
-> Prerequisites: Node.js ≥ 20, pnpm ≥ 9. For the desktop build also: Rust toolchain and the
-> Tauri prerequisites for your OS.
+> Prerequisites: Node.js ≥ 22.13, pnpm ≥ 11. For the desktop build also: Rust toolchain and
+> the Tauri prerequisites for your OS.
 
 ```bash
 pnpm install
@@ -125,20 +129,20 @@ The desktop build bundles `yt-dlp` and `ffmpeg` as sidecars (see
 ## Testing
 
 ```bash
-pnpm test           # Vitest unit tests (engine + UI)
-pnpm test:e2e       # Playwright end-to-end
+pnpm test           # Vitest unit tests (engine + framework-free app helpers)
 pnpm lint           # Biome lint
 pnpm typecheck      # tsc --noEmit, strict
 ```
 
 Tests follow F.I.R.S.T principles and mirror the source tree. The engine is the heavily
-tested layer (deterministic, framework-free).
+tested layer (deterministic, framework-free). Playwright e2e (`pnpm test:e2e`) is **planned**
+— DOM/WASM-bound paths (canvas, ffmpeg, pdf) are not yet covered by automated tests.
 
 ## Deploy
 
 - **Web** → Cloudflare Pages. Two options:
   1. **Dashboard (recommended):** connect the GitHub repo in Cloudflare Pages with build
-     command `pnpm build`, output directory `apps/web/out`, and `NODE_VERSION=20`.
+     command `pnpm build`, output directory `apps/web/out`, and `NODE_VERSION=22`.
   2. **Actions + wrangler:** add `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets and
      a deploy job. CI (`.github/workflows/ci.yml`) already lints, typechecks, and builds on
      every push/PR. `COOP`/`COEP` ship via `public/_headers` for threaded WASM.

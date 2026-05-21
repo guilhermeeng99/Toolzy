@@ -29,7 +29,10 @@ each path, and any size caps.
 
 ## 2. Engine Contract
 
-How this feature implements the `Converter` interface (see `CLAUDE.md` → Engine).
+How this feature plugs into the engine (see `CLAUDE.md` → Engine). **1:1 conversions**
+implement `Converter` and register via `registerBuiltins`; **1→N / N→1 or runtime-coupled**
+tools are dedicated `Result`-returning functions (see `pdf-tools.md` / `media-convert.md`).
+Show the shape either way.
 
 ```ts
 const fooConverter: Converter<FooOptions> = {
