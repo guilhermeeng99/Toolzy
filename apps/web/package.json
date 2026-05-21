@@ -12,6 +12,7 @@
     "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
+    "@tauri-apps/api": "^2.1.1",
     "@toolzy/engine": "workspace:*",
     "comlink": "^4.4.2",
     "fflate": "^0.8.2",

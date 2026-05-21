@@ -54,7 +54,7 @@ export const TOOLS: ToolMeta[] = [
     slug: "media-download",
     name: "Media downloader",
     description: "Save audio and video from a link as MP4 or MP3. Desktop app only.",
-    href: "#",
+    href: "/tools/download",
     icon: "download",
     status: "soon",
     env: "desktop",
