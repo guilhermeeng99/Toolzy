@@ -26,6 +26,7 @@ desktop-only native — the web build and monorepo were removed (see
 | E | Cutover + full docs refresh | ✅ Done |
 | F | Landing site | ✅ Done |
 | G | Release pipeline + auto-update (CI installer, signed updater, Pages) | ✅ Done |
+| H | Audio + video editing (ffmpeg) | ✅ Done |
 
 ---
 
@@ -50,6 +51,13 @@ desktop-only native — the web build and monorepo were removed (see
 - ✅ **E — Cutover + docs**: removed `apps/web`, old `apps/desktop`, `packages/*`, Turborepo,
   pnpm workspace, root vitest. Rewrote README, CLAUDE.md, all `docs/specs/*` (ADRs
   desktop-first) and this roadmap. CI = Biome + app/site builds.
+- ✅ **H — Audio + video editing**: native ffmpeg edits beyond convert. **Audio** (modes of the
+  renamed **Audio** tab): `trim_audio` / `change_audio_volume` / `change_audio_speed`.
+  **Video** (new **Video** tab): `trim_video` (lossless), `merge_videos` (concat-demuxer copy),
+  `add_audio_to_video` (replace track), `rotate_video` (transpose), `mirror_video`
+  (hflip/vflip), `change_video_speed` (setpts + atempo). Shared `ffmpeg.rs` (`run_ffmpeg`,
+  `with_suffix`, `atempo_chain`, `probe_duration`); filter/arg builders cargo-tested. Specs:
+  [audio-edit](specs/audio-edit.md) + [video-edit](specs/video-edit.md).
 - ✅ **F — Landing site**: static `site/` (Vite + Tailwind) presenting the app + a download
   CTA to GitHub Releases.
 - ✅ **G — Release & distribution**: GitHub Actions pipeline — CI (Biome + app/site build +
@@ -73,7 +81,10 @@ desktop-only native — the web build and monorepo were removed (see
 - 💡 Image: crop/rotate, background removal, watermark, EXIF strip.
 - ✅ PDF: compress, merge, reorder, password add/remove _(shipped — Phase C)_. ⬜ Remaining:
   **split** (extract page ranges), page-level reorder, lossless "keep text" compress.
-- 💡 Video transcode (mp4 → webm/gif, trim, resize) via native ffmpeg.
+- ✅ Audio editing: trim, volume, speed _(shipped — Phase H)_.
+- ✅ Video editing: trim, merge, add-audio, rotate, mirror, speed _(shipped — Phase H)_.
+  ⬜ Remaining: transcode (mp4 → webm/gif), resize/scale, crop; re-encode merge for mixed-format
+  clips; mix (not replace) added audio.
 - 💡 In-app save-folder picker; reorder/drag in batch lists.
 
 ## Out of scope (deliberate)

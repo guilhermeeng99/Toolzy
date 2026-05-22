@@ -18,9 +18,17 @@ export const MEDIA_EXTENSIONS = [
   "ogg",
 ];
 
+/** Source extensions for the audio *edit* modes (trim/volume/speed — audio only). */
+export const AUDIO_EXTENSIONS = ["mp3", "wav", "m4a", "flac", "aac", "ogg"];
+
 /** Convert/extract audio from a media file via the bundled ffmpeg sidecar. */
 export function convertMedia(path: string, target: AudioTarget): Promise<string> {
   return invoke<string>("convert_media", { path, target });
+}
+
+/** Read a local media file's duration in seconds (ffmpeg). Feeds the trim UIs. */
+export function probeDuration(path: string): Promise<number> {
+  return invoke<number>("probe_duration", { path });
 }
 
 export type DownloadFormat = "mp4" | "mp3";

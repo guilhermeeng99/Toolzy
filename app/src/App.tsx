@@ -3,15 +3,17 @@ import { DownloadTool } from "./components/DownloadTool";
 import { ImageTool } from "./components/ImageTool";
 import { MediaTool } from "./components/MediaTool";
 import { PdfTool } from "./components/PdfTool";
+import { VideoTool } from "./components/VideoTool";
 import { focusRing, pill } from "./components/ui";
 import { type Update, checkForUpdate, getVersion, installUpdate } from "./lib/update";
 
-type Tool = "image" | "pdf" | "media" | "download";
+type Tool = "image" | "pdf" | "media" | "video" | "download";
 
 const TOOLS: { id: Tool; label: string }[] = [
   { id: "image", label: "Image" },
   { id: "pdf", label: "PDF" },
-  { id: "media", label: "Media" },
+  { id: "media", label: "Audio" },
+  { id: "video", label: "Video" },
   { id: "download", label: "Download" },
 ];
 
@@ -26,8 +28,12 @@ const TOOL_META: Record<Tool, { title: string; description: string }> = {
       "Convert, merge, compress, and password-protect PDFs — all native, all on your machine.",
   },
   media: {
-    title: "Media converter",
-    description: "Extract or convert audio from your files, like MP4 to MP3 — native ffmpeg.",
+    title: "Audio tools",
+    description: "Convert, trim, and adjust volume or speed of your audio — native ffmpeg.",
+  },
+  video: {
+    title: "Video tools",
+    description: "Trim, merge, rotate, mirror, add audio, or change speed — all native ffmpeg.",
   },
   download: {
     title: "Media downloader",
@@ -39,6 +45,7 @@ function ToolView({ tool }: { tool: Tool }) {
   if (tool === "image") return <ImageTool />;
   if (tool === "pdf") return <PdfTool />;
   if (tool === "media") return <MediaTool />;
+  if (tool === "video") return <VideoTool />;
   return <DownloadTool />;
 }
 

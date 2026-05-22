@@ -1,4 +1,6 @@
+mod audio_edit;
 mod download;
+mod ffmpeg;
 mod image_convert;
 mod media;
 mod pdf;
@@ -8,6 +10,7 @@ mod pdf_merge;
 mod pdf_protect;
 mod qpdf;
 mod thumbnail;
+mod video_edit;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -26,6 +29,16 @@ pub fn run() {
             pdf_protect::add_pdf_password,
             pdf_protect::remove_pdf_password,
             media::convert_media,
+            ffmpeg::probe_duration,
+            audio_edit::trim_audio,
+            audio_edit::change_audio_volume,
+            audio_edit::change_audio_speed,
+            video_edit::trim_video,
+            video_edit::merge_videos,
+            video_edit::add_audio_to_video,
+            video_edit::rotate_video,
+            video_edit::mirror_video,
+            video_edit::change_video_speed,
             download::probe_media,
             download::download_media
         ])

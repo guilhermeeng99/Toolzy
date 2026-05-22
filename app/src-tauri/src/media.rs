@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use tauri_plugin_shell::ShellExt;
+use crate::ffmpeg::run_ffmpeg;
 
 pub const AUDIO_TARGETS: &[&str] = &["mp3", "m4a", "wav"];
 
@@ -34,24 +34,8 @@ pub async fn convert_media(
     args.extend(audio_codec(&target));
     args.push(out_str.clone());
 
-    let output = app
-        .shell()
-        .sidecar("ffmpeg")
-        .map_err(|e| e.to_string())?
-        .args(args)
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-        Ok(out_str)
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(format!(
-            "ffmpeg failed. {}",
-            stderr.lines().last().unwrap_or("unknown error")
-        ))
-    }
+    run_ffmpeg(&app, args).await?;
+    Ok(out_str)
 }
 
 #[cfg(test)]

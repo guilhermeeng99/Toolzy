@@ -67,12 +67,14 @@ export function Slider({
   value,
   onChange,
   width = "100%",
+  step = 1,
 }: {
   min: number;
   max: number;
   value: number;
   onChange: (v: number) => void;
   width?: string;
+  step?: number;
 }) {
   const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
@@ -80,6 +82,7 @@ export function Slider({
       type="range"
       min={min}
       max={max}
+      step={step}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
       className="toolzy-range"
