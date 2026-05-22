@@ -1,9 +1,14 @@
 import type { CSSProperties } from "react";
 
+/** Visible keyboard-focus ring (a11y) — shared by every interactive control. */
+export const focusRing =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-blue focus-visible:ring-offset-2";
+
 /** Selectable "segmented pill" button styling. */
 export function pill(active: boolean): string {
   return [
     "rounded-lg px-4 py-1.5 text-body-lg font-semibold uppercase transition-colors",
+    focusRing,
     active
       ? "bg-action-blue text-snow-white"
       : "bg-pale-gray text-midnight-indigo hover:bg-platinum-tint",
@@ -25,7 +30,7 @@ export function PrimaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElemen
   return (
     <button
       type={type === "submit" ? "submit" : "button"}
-      className={`rounded-lg bg-action-blue px-6 py-3 text-body-lg font-semibold text-snow-white transition hover:brightness-105 disabled:opacity-50 ${className ?? ""}`}
+      className={`rounded-lg bg-action-blue px-6 py-3 text-body-lg font-semibold text-snow-white transition hover:brightness-105 disabled:opacity-50 ${focusRing} ${className ?? ""}`}
       {...rest}
     />
   );

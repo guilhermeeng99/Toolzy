@@ -10,7 +10,7 @@ import {
   mp3SizeEstimate,
   probeMedia,
 } from "../lib/media";
-import { Card, Field, PrimaryButton, pill } from "./ui";
+import { Card, Field, PrimaryButton, focusRing, pill } from "./ui";
 
 type Tab = "mp4" | "mp3";
 type RowResult = { ok: boolean; message: string };
@@ -105,7 +105,7 @@ export function DownloadTool() {
         </Field>
       </Card>
 
-      {error ? <p className="text-body-lg text-danger">Could not read this link. {error}</p> : null}
+      {error ? <p className="text-body-lg text-danger">{error}</p> : null}
 
       {probe ? (
         <ResultPanel
@@ -408,7 +408,7 @@ function DownloadButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-lg bg-action-blue px-4 py-2 text-body font-semibold text-snow-white transition hover:brightness-105 disabled:opacity-50"
+      className={`rounded-lg bg-action-blue px-4 py-2 text-body font-semibold text-snow-white transition hover:brightness-105 disabled:opacity-50 ${focusRing}`}
     >
       {busy ? "Saving..." : "Download"}
     </button>

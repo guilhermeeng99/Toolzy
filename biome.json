@@ -9,7 +9,8 @@
       "**/dist/**",
       "**/gen/**",
       "**/target/**",
-      "**/tauri.conf.json"
+      "**/tauri.conf.json",
+      "app/package.json"
     ]
   },
   "formatter": {

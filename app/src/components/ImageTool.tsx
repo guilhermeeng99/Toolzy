@@ -1,6 +1,5 @@
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   IMAGE_EXTENSIONS,
   IMAGE_TARGETS,
@@ -11,27 +10,25 @@ import {
   convertImage,
 } from "../lib/convert";
 import { formatBytes, sizeDelta } from "../lib/format";
-import { Badge, Card, Field, NumberInput, PrimaryButton, Slider, dropzoneClass, pill } from "./ui";
+import { type QueueItem, useBatchQueue } from "../lib/useBatchQueue";
+import { useFileDrop } from "../lib/useFileDrop";
+import {
+  Badge,
+  Card,
+  Field,
+  NumberInput,
+  PrimaryButton,
+  Slider,
+  dropzoneClass,
+  focusRing,
+  pill,
+} from "./ui";
 
 const MODES: ResizeMode[] = ["none", "percent", "px"];
 
-type ItemStatus = "pending" | "working" | "done" | "error";
-
-interface Item {
-  id: string;
-  path: string;
-  name: string;
-  status: ItemStatus;
-  inBytes?: number;
-  outBytes?: number;
-  error?: string;
-}
-
-const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
-const extOf = (p: string) => p.split(".").pop()?.toLowerCase() ?? "";
+type ImageItem = QueueItem & Partial<{ inBytes: number; outBytes: number }>;
 
 export function ImageTool() {
-  const [items, setItems] = useState<Item[]>([]);
   const [target, setTarget] = useState<ImageTarget>("webp");
   const [quality, setQuality] = useState(80);
   const [mode, setMode] = useState<ResizeMode>("none");
@@ -39,49 +36,6 @@ export function ImageTool() {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [keepAspect, setKeepAspect] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [over, setOver] = useState(false);
-
-  const addPaths = useCallback((paths: string[]) => {
-    const imgs = paths.filter((p) => IMAGE_EXTENSIONS.includes(extOf(p)));
-    if (imgs.length === 0) return;
-    setItems((prev) => {
-      const known = new Set(prev.map((i) => i.path));
-      const next = imgs
-        .filter((p) => !known.has(p))
-        .map((p) => ({
-          id: crypto.randomUUID(),
-          path: p,
-          name: baseName(p),
-          status: "pending" as const,
-        }));
-      return next.length > 0 ? [...prev, ...next] : prev;
-    });
-  }, []);
-
-  // Native OS file drop (Tauri gives real paths, not browser File objects).
-  useEffect(() => {
-    const unlisten = getCurrentWebview().onDragDropEvent((e) => {
-      if (e.payload.type === "over") setOver(true);
-      else if (e.payload.type === "drop") {
-        setOver(false);
-        addPaths(e.payload.paths);
-      } else setOver(false);
-    });
-    return () => {
-      unlisten.then((f) => f());
-    };
-  }, [addPaths]);
-
-  async function choose() {
-    const picked = await open({
-      multiple: true,
-      directory: false,
-      filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
-    });
-    if (Array.isArray(picked)) addPaths(picked);
-    else if (typeof picked === "string") addPaths([picked]);
-  }
 
   function buildResize(): ResizeOpt | undefined {
     if (mode === "none") return undefined;
@@ -94,32 +48,26 @@ export function ImageTool() {
     };
   }
 
-  async function run() {
-    setRunning(true);
-    const resize = buildResize();
+  const { items, running, pending, addPaths, run, remove, clear } = useBatchQueue<{
+    inBytes: number;
+    outBytes: number;
+  }>(IMAGE_EXTENSIONS, (item) => {
     const q = QUALITY_TARGETS.has(target) ? quality : undefined;
-    const queue = items.filter((i) => i.status === "pending" || i.status === "error");
-    for (const item of queue) {
-      patch(item.id, { status: "working", error: undefined });
-      try {
-        const res = await convertImage({ path: item.path, target, quality: q, resize });
-        patch(item.id, { status: "done", inBytes: res.inBytes, outBytes: res.outBytes });
-      } catch (e) {
-        patch(item.id, { status: "error", error: String(e) });
-      }
-    }
-    setRunning(false);
+    return convertImage({ path: item.path, target, quality: q, resize: buildResize() });
+  });
+
+  const over = useFileDrop(addPaths);
+
+  async function choose() {
+    const picked = await open({
+      multiple: true,
+      directory: false,
+      filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
+    });
+    if (Array.isArray(picked)) addPaths(picked);
+    else if (typeof picked === "string") addPaths([picked]);
   }
 
-  function patch(id: string, change: Partial<Item>) {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...change } : i)));
-  }
-
-  function remove(id: string) {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-  }
-
-  const pending = items.filter((i) => i.status === "pending" || i.status === "error").length;
   const isLossy = QUALITY_TARGETS.has(target);
 
   return (
@@ -203,9 +151,9 @@ export function ImageTool() {
             </PrimaryButton>
             <button
               type="button"
-              onClick={() => setItems([])}
+              onClick={clear}
               disabled={running}
-              className="text-body-lg font-semibold text-slate-blue transition-colors hover:text-midnight-indigo disabled:opacity-50"
+              className={`text-body-lg font-semibold text-slate-blue transition-colors hover:text-midnight-indigo disabled:opacity-50 ${focusRing}`}
             >
               Clear
             </button>
@@ -222,7 +170,7 @@ export function ImageTool() {
   );
 }
 
-function FileRow({ item, onRemove }: { item: Item; onRemove: (id: string) => void }) {
+function FileRow({ item, onRemove }: { item: ImageItem; onRemove: (id: string) => void }) {
   return (
     <li className="flex items-center gap-4 rounded-2xl bg-snow-white p-3 shadow-sm-2">
       <div className="min-w-0 flex-1">
@@ -248,7 +196,7 @@ function FileRow({ item, onRemove }: { item: Item; onRemove: (id: string) => voi
         <button
           type="button"
           onClick={() => onRemove(item.id)}
-          className="text-slate-blue transition-colors hover:text-midnight-indigo"
+          className={`text-slate-blue transition-colors hover:text-midnight-indigo ${focusRing}`}
           aria-label={`Remove ${item.name}`}
         >
           x

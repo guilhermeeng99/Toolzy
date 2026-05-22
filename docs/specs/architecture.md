@@ -1,7 +1,7 @@
 # Architecture & Decision Records
 
 > **Status**: Living document
-> **Last updated**: 2026-05-21
+> **Last updated**: 2026-05-22
 > Cross-cutting design + the rationale (ADRs) behind the big choices. Feature-level contracts
 > live in sibling files (`image-conversion.md`, etc.); start new ones from `_template.md`.
 
@@ -85,6 +85,10 @@ residential IP**. Toolzy hosts nothing for it.
 landing page (`site/`) links to them and can be hosted on any static host (GitHub/Cloudflare
 Pages).
 
+**Status note (2026-05-22).** Live: a GitHub Actions pipeline auto-builds and publishes the
+**Windows** installer on each push to `main` (macOS/Linux still manual), and the site
+auto-deploys to **GitHub Pages** (`deploy-site.yml`). In-app updates: ADR-008.
+
 ### ADR-005: Library & license choices
 **Status:** Accepted · 2026-05-21
 
@@ -131,6 +135,23 @@ the pnpm workspace). Keep a static landing page.
 - ⚠️ The conversion logic moved from TypeScript to Rust; the old `Converter`/registry/`Result`
   TS engine is gone.
 
+### ADR-008: In-app auto-update (signed)
+**Status:** Accepted · 2026-05-22
+
+**Context.** A desktop app distributed outside an app store still needs a way to ship fixes
+without the user re-downloading installers.
+
+**Decision.** Bundle **`tauri-plugin-updater`**. On launch the app checks a `latest.json` on
+GitHub Releases; release artifacts are **minisign-signed** in CI (`TAURI_SIGNING_PRIVATE_KEY`)
+and verified against the public key in `tauri.conf.json` before installing. The UI shows the
+current version and an "Update to vX" button (`lib/update.ts`, `App.tsx`); a failed check is
+swallowed (offline → no prompt, never throws to the UI).
+
+**Consequences.**
+- ✅ One-click updates; the signature check rejects tampered artifacts.
+- ⚠️ The signing key must stay secret; losing it breaks the update chain for installed apps.
+- ⚠️ One outbound request to GitHub at startup (a version check — no file contents).
+
 ---
 
 ## Cross-cutting concerns
@@ -153,3 +174,10 @@ The UI gets real paths from native dialogs (`@tauri-apps/plugin-dialog`) and OS 
 ### Privacy
 No content-inspecting telemetry; no uploads; no Toolzy server in any path. Validate inputs
 (e.g. http(s) URLs) before spawning a sidecar.
+
+Only two outbound requests exist, both direct from the user's machine and unrelated to file
+contents: (1) the updater's startup version check against GitHub Releases (ADR-008), and
+(2) the downloader's video **thumbnail** in the probe result, loaded from the source host
+(e.g. `i.ytimg.com`) — the same host the download itself hits. The webview runs under a
+restrictive **CSP** (`tauri.conf.json` → `app.security.csp`): `default-src 'self'` with remote
+images allowed (`img-src https: data:`) for that thumbnail and no remote scripts.

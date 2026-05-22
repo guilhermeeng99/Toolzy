@@ -11,5 +11,5 @@ pnpm dev                          # local preview
 pnpm build                        # static output → dist/
 ```
 
-Deploy `dist/` to any static host (GitHub Pages / Cloudflare Pages). Update the download
-link in `index.html` (`/releases`) once installers are published.
+Deploys to **GitHub Pages** automatically via `.github/workflows/deploy-site.yml` (or push
+`dist/` to any static host). The download link in `index.html` points at GitHub Releases.

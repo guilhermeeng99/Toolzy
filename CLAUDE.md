@@ -28,11 +28,12 @@ natively); the **React + TypeScript (Vite)** UI is a thin webview front-end. See
 app/
   src/                # React + TS UI (Vite). Presentation only.
     components/        #   tools (ImageTool, PdfTool, MediaTool, DownloadTool) + shared ui.tsx
-    lib/               #   typed invoke() wrappers (convert.ts, pdf.ts, media.ts, format.ts)
+    lib/               #   invoke() wrappers + shared hooks/helpers (convert, pdf, media,
+                       #     format, path, update, useFileDrop, useBatchQueue)
   src-tauri/          # Rust = the engine
     src/
-      lib.rs           #   builder + #[tauri::command]s (convert_image, …) + command registry
-      image_convert.rs #   pure image helpers (resize/naming) + cargo tests
+      lib.rs           #   Tauri builder + command registry
+      image_convert.rs #   image engine: convert_image command + resize/naming helpers + tests
       pdf.rs / pdf_build.rs   #   pdfium render / printpdf build
       media.rs / download.rs  #   ffmpeg + yt-dlp sidecar commands (download has unit tests)
     capabilities/      #   Tauri permissions (dialog, shell sidecar allow-list)

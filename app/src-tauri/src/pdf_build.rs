@@ -33,7 +33,7 @@ pub fn images_to_pdf(paths: Vec<String>, out_path: String) -> Result<String, Str
     Ok(out_path)
 }
 
-/// Decode an image to raw RGB8 (pdf-lib embeds raw pixels here).
+/// Decode an image to raw RGB8 (printpdf embeds the raw pixels as an image XObject).
 fn load_rgb(path: &str) -> Result<(u32, u32, Vec<u8>), String> {
     let img = ImageReader::open(Path::new(path))
         .map_err(|e| format!("open failed: {e}"))?

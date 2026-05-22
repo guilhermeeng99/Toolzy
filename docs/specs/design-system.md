@@ -1,7 +1,7 @@
 # Design System Spec
 
 > **Status**: Shipped (tokens + shared components in the desktop app)
-> **Last updated**: 2026-05-21
+> **Last updated**: 2026-05-22
 > **Coverage**: Theme, Colors, Typography, Spacing, Radius, Elevation, Components, Layout, Do/Don't, a11y
 > **Source of truth**: `app/src/styles.css` (`@theme` block); shared components in
 > `app/src/components/ui.tsx`. Derived from the Calendly reference the owner provided.
@@ -35,8 +35,8 @@ reference vocabulary stay aligned:
 --font-gilroy: "Montserrat", ui-sans-serif, system-ui, sans-serif;
 ```
 
-If a licensed Gilroy is ever purchased, swap the `var(--font-montserrat)` source — no
-component changes needed. Weights used: 400 / 500 / 600 / 700.
+If a licensed Gilroy is ever purchased, swap the `--font-gilroy` value — no component changes
+needed. Weights used: 400 / 500 / 600 / 700.
 
 ---
 
@@ -83,7 +83,10 @@ Family: `font-gilroy` (Montserrat). Scale (each utility carries its line-height)
 | `text-display-sm` | 38px | 1.21 | section title (mobile hero) |
 | `text-display` | 50px | 1.1 | section hero |
 | `text-display-lg` | 68px | 1.1 | page hero (desktop) |
-| `text-display-xl` | 80px | 1.0 | oversized hero |
+
+> **Defined where:** the app (`app/src/styles.css`) ships through `text-display-sm` (it only
+> needs the smaller end). The landing site (`site/src/styles.css`) additionally defines
+> `text-display` / `text-display-lg` for its hero. Add a token before using it.
 
 Weights: `font-normal` 400 (body) · `font-medium` 500 (nav) · `font-semibold` 600 (titles,
 buttons) · `font-bold` 700 (display headlines). Letter spacing: normal.
@@ -114,13 +117,14 @@ card and grid gaps `gap-6`. Stay on the scale to keep the 8px feel.
 
 ## 6. Elevation (shadows)
 
-Three soft, slate-tinted (`rgba(71,103,136,…)`) shadows. Map by intent:
+Two soft, slate-tinted (`rgba(71,103,136,…)`) shadows are defined — `--shadow-sm` and
+`--shadow-sm-2`. Map by intent:
 
 | Intent | Token / utility |
 |---|---|
-| Resting card | `shadow-sm-2` (the deep triple-layer — featured/elevated surfaces) |
+| Resting / elevated card | `shadow-sm-2` (the deep triple-layer — featured surfaces) |
 | Hover / interactive lift | `shadow-sm` |
-| Button / focus | `shadow-sm-3` |
+| Button focus | a `focus-visible` ring (`focusRing` in `ui.tsx`), not a shadow |
 
 Don't put heavy shadows on non-interactive, non-emphasized elements.
 
@@ -132,15 +136,15 @@ Class recipes (Tailwind v4 utilities). Implemented in `app/src/components/ui.tsx
 
 ### Button
 - **Primary CTA**: `bg-action-blue text-snow-white rounded-lg font-semibold px-4 py-1.5`
-  (lg size: `px-6 py-3 text-body-lg`). Hover: subtle lift (`shadow-sm-3`) / `brightness-105`.
-  Focus: `focus-visible:ring-2 ring-action-blue ring-offset-2`.
+  (lg size: `px-6 py-3 text-body-lg`). Hover: `brightness-105`.
+  Focus: `focus-visible:ring-2 ring-action-blue ring-offset-2` (the shared `focusRing`).
 - **Ghost (dark)**: transparent, `text-midnight-indigo font-semibold`, `rounded-lg`,
   optional `border border-platinum-tint`. Secondary actions.
 - **Ghost (neutral)**: transparent, `text-text-black`. Tertiary/nav contexts.
 - **Ghost (light)**: transparent, `text-snow-white`, `rounded-md`. For dark backgrounds.
 
 ### Card (Floating Content Card)
-`bg-snow-white rounded-2xl shadow-sm-2` + padding (`p-24`/`p-32`). Hover (if interactive):
+`bg-snow-white rounded-2xl shadow-sm-2 p-6` (24px). Hover (if interactive):
 `transition-shadow hover:shadow-sm`. No border by default.
 
 ### Badge (Informational)
@@ -158,9 +162,8 @@ underline or color shift on hover.
 
 ## 8. Layout
 
-- **Container**: max-width centered (~1200px), horizontal padding responsive
-  (`px-24` desktop / `px-16` mobile). Background `snow-white`; alternating sections may use
-  `cloud-mist`.
+- **Container**: max-width centered (app `max-w-[1000px]`, site `max-w-[1100px]`), horizontal
+  padding `px-6` (24px). Background `snow-white`; alternating sections may use `cloud-mist`.
 - **Header**: sticky top bar, `bg-snow-white/90` + backdrop blur, hairline
   `border-b border-outline-gray`. Currently **minimal — just the Toolzy logo** (left). Nav and
   a right-aligned CTA ("Get the desktop app") can return once there are more destinations.

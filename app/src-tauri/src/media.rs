@@ -53,3 +53,23 @@ pub async fn convert_media(
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mp3_uses_libmp3lame() {
+        assert!(audio_codec("mp3").contains(&"libmp3lame".to_string()));
+    }
+
+    #[test]
+    fn m4a_uses_aac() {
+        assert!(audio_codec("m4a").contains(&"aac".to_string()));
+    }
+
+    #[test]
+    fn wav_falls_back_to_pcm() {
+        assert!(audio_codec("wav").contains(&"pcm_s16le".to_string()));
+    }
+}

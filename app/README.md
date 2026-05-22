@@ -12,13 +12,14 @@ Tools: **Image** (convert/resize, batch, drag-drop), **PDF** (pages↔images), *
 app/
   src/                  # React + TS UI
     components/         #   ImageTool, PdfTool, MediaTool, DownloadTool, shared ui.tsx
-    lib/                #   typed invoke() wrappers (convert, pdf, media, format)
+    lib/                #   invoke() wrappers + shared hooks (convert, pdf, media, format,
+                        #     path, update, useFileDrop, useBatchQueue)
   src-tauri/            # Rust = engine
     src/
-      lib.rs            #   commands: convert_image (+ encode)
-      image_convert.rs  #   pure helpers + cargo tests
+      lib.rs            #   Tauri builder + command registry
+      image_convert.rs  #   image engine: convert_image + resize/naming helpers + tests
       pdf.rs / pdf_build.rs
-      media.rs / download.rs   #   ffmpeg + yt-dlp sidecars (download cargo-tested)
+      media.rs / download.rs   #   ffmpeg + yt-dlp sidecars (cargo-tested)
   scripts/fetch-binaries.mjs
 ```
 

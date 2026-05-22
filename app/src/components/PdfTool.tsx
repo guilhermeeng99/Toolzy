@@ -1,9 +1,10 @@
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { IMAGE_EXTENSIONS } from "../lib/convert";
+import { baseName, extOf } from "../lib/path";
 import { type PdfImageFormat, imagesToPdf, pdfToImages } from "../lib/pdf";
-import { Card, Field, PrimaryButton, Slider, dropzoneClass, pill } from "./ui";
+import { useFileDrop } from "../lib/useFileDrop";
+import { Card, Field, PrimaryButton, Slider, dropzoneClass, focusRing, pill } from "./ui";
 
 type Mode = "to-images" | "to-pdf";
 
@@ -27,9 +28,6 @@ export function PdfTool() {
     </div>
   );
 }
-
-const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
-const extOf = (p: string) => p.split(".").pop()?.toLowerCase() ?? "";
 
 function PdfToImages() {
   const [path, setPath] = useState<string | null>(null);
@@ -119,7 +117,6 @@ function PdfToImages() {
 
 function ImagesToPdf() {
   const [paths, setPaths] = useState<string[]>([]);
-  const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -129,18 +126,7 @@ function ImagesToPdf() {
     setPaths((prev) => [...prev, ...imgs.filter((p) => !prev.includes(p))]);
   }, []);
 
-  useEffect(() => {
-    const unlisten = getCurrentWebview().onDragDropEvent((e) => {
-      if (e.payload.type === "over") setOver(true);
-      else if (e.payload.type === "drop") {
-        setOver(false);
-        addPaths(e.payload.paths);
-      } else setOver(false);
-    });
-    return () => {
-      unlisten.then((f) => f());
-    };
-  }, [addPaths]);
+  const over = useFileDrop(addPaths);
 
   async function choose() {
     const picked = await open({
@@ -199,7 +185,7 @@ function ImagesToPdf() {
                 <button
                   type="button"
                   onClick={() => setPaths((prev) => prev.filter((x) => x !== p))}
-                  className="text-slate-blue hover:text-midnight-indigo"
+                  className={`text-slate-blue hover:text-midnight-indigo ${focusRing}`}
                   aria-label={`Remove ${baseName(p)}`}
                 >
                   x
@@ -215,7 +201,7 @@ function ImagesToPdf() {
               type="button"
               onClick={() => setPaths([])}
               disabled={busy}
-              className="text-body-lg font-semibold text-slate-blue transition-colors hover:text-midnight-indigo disabled:opacity-50"
+              className={`text-body-lg font-semibold text-slate-blue transition-colors hover:text-midnight-indigo disabled:opacity-50 ${focusRing}`}
             >
               Clear
             </button>

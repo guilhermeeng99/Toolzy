@@ -90,6 +90,10 @@ jobs:
           jq --arg v "$next" '.version = $v' app/src-tauri/tauri.conf.json > "$tmp"
           mv "$tmp" app/src-tauri/tauri.conf.json
           sed -i -E "0,/^version = \".*\"$/ s//version = \"$next\"/" app/src-tauri/Cargo.toml
+          # Keep the app manifest in lockstep (cosmetic, but avoids version drift).
+          tmp=$(mktemp)
+          jq --arg v "$next" '.version = $v' app/package.json > "$tmp"
+          mv "$tmp" app/package.json
           echo "bumped $current -> $next"
 
       - name: Commit, tag, push
@@ -97,7 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           next="${{ steps.bump.outputs.next }}"
-          git add app/src-tauri/tauri.conf.json app/src-tauri/Cargo.toml
+          git add app/src-tauri/tauri.conf.json app/src-tauri/Cargo.toml app/package.json
           git commit -m "chore(release): v${next} [skip ci]"
           git tag "v${next}"
           git push origin main

@@ -3,7 +3,7 @@ import { DownloadTool } from "./components/DownloadTool";
 import { ImageTool } from "./components/ImageTool";
 import { MediaTool } from "./components/MediaTool";
 import { PdfTool } from "./components/PdfTool";
-import { pill } from "./components/ui";
+import { focusRing, pill } from "./components/ui";
 import { type Update, checkForUpdate, getVersion, installUpdate } from "./lib/update";
 
 type Tool = "image" | "pdf" | "media" | "download";
@@ -91,7 +91,7 @@ export function App() {
               type="button"
               onClick={applyUpdate}
               disabled={updating}
-              className="rounded-lg bg-action-blue px-3 py-1.5 text-body font-semibold text-snow-white transition hover:brightness-105 disabled:opacity-50"
+              className={`rounded-lg bg-action-blue px-3 py-1.5 text-body font-semibold text-snow-white transition hover:brightness-105 disabled:opacity-50 ${focusRing}`}
             >
               {updating ? "Updating..." : `Update to v${update.version}`}
             </button>

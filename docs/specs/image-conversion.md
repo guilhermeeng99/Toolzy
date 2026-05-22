@@ -2,7 +2,7 @@
 
 > **Status**: Shipped (native). PNG/JPG/WebP/GIF/BMP/TIFF + resize/quality, batch, drag-drop.
 > AVIF/JPEG-XL planned.
-> **Last updated**: 2026-05-21
+> **Last updated**: 2026-05-22
 > **Environment**: desktop (native)
 
 Convert and resize images natively on the user's machine. Pick or drop one or many files,
@@ -20,8 +20,9 @@ the source. Nothing is uploaded.
 
 ## 1. Supported Formats
 
-Decode: anything `image` reads (incl. webp/avif input). Encode (targets): `png`, `jpg`,
-`webp`, `gif`, `bmp`, `tiff`.
+Decode: anything `image` reads (incl. webp/avif/ico input). Encode (targets): `png`, `jpg`,
+`webp`, `gif`, `bmp`, `tiff`. The picker also accepts `jpeg`/`tif`/`ico` as input; `ico` is
+**decode-only** (not an output target).
 
 - **png / gif / bmp / tiff** — `image` crate, lossless.
 - **jpg** — `image` `JpegEncoder` with quality (drops alpha; no transparency).
@@ -33,7 +34,7 @@ Decode: anything `image` reads (incl. webp/avif input). Encode (targets): `png`,
 ## 2. Engine Contract (Rust command)
 
 ```rust
-// app/src-tauri/src/lib.rs (+ pure helpers in image_convert.rs)
+// app/src-tauri/src/image_convert.rs (command + pure helpers, cargo-tested)
 #[derive(Deserialize)] struct ResizeOpt {           // serde rename_all = camelCase
   mode: String,            // "none" | "px" | "percent"
   width: Option<u32>, height: Option<u32>,

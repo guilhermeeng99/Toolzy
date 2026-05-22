@@ -1,6 +1,6 @@
 # Toolzy — Roadmap
 
-> **Last updated**: 2026-05-21
+> **Last updated**: 2026-05-22
 > Single source of truth for what is **done**, **in progress**, and **planned**.
 > Update in the same change that shifts scope (see `CLAUDE.md` → Post-Change Checklist).
 
@@ -25,6 +25,7 @@ desktop-only native — the web build and monorepo were removed (see
 | D | Media + downloader (ffmpeg / yt-dlp) | ✅ Done |
 | E | Cutover + full docs refresh | ✅ Done |
 | F | Landing site | ✅ Done |
+| G | Release pipeline + auto-update (CI installer, signed updater, Pages) | ✅ Done |
 
 ---
 
@@ -48,18 +49,21 @@ desktop-only native — the web build and monorepo were removed (see
   desktop-first) and this roadmap. CI = Biome + app/site builds.
 - ✅ **F — Landing site**: static `site/` (Vite + Tailwind) presenting the app + a download
   CTA to GitHub Releases.
+- ✅ **G — Release & distribution**: GitHub Actions pipeline — CI (Biome + app/site build +
+  `cargo test`) gates a patch bump → tag → **signed Windows installer** via `tauri-action`,
+  published to GitHub Releases. In-app **auto-update** (`tauri-plugin-updater`, minisign-verified
+  `latest.json`) with a current-version badge. Landing site auto-deploys to **GitHub Pages**
+  (`deploy-site.yml`).
 
 ---
 
 ## Next / open
 
 - ⬜ AVIF + JPEG-XL image output (heavy native encoders).
-- ⬜ First real installers: generate final icons, fetch sidecars + pdfium, `pnpm tauri build`
-  per OS, publish to GitHub Releases; point the site download link at the assets.
-- ⬜ Site deploy workflow (GitHub/Cloudflare Pages).
+- ⬜ macOS / Linux installers in CI (the release job builds the **Windows** installer only today).
+- ⬜ Final app icons (the current set is a placeholder; `pnpm tauri icon <png>`).
 - ⬜ Live progress for media convert (stream sidecar output). _(Download progress: ✅ done —
   yt-dlp `--progress-template` streamed to the UI via a Tauri `Channel`.)_
-- ⬜ Rust CI job (needs Tauri Linux deps + sidecars present).
 
 ## Backlog / ideas
 
@@ -67,7 +71,6 @@ desktop-only native — the web build and monorepo were removed (see
 - 💡 PDF: compress, split/merge, reorder, password add/remove.
 - 💡 Video transcode (mp4 → webm/gif, trim, resize) via native ffmpeg.
 - 💡 In-app save-folder picker; reorder/drag in batch lists.
-- 💡 Auto-update (Tauri updater) + signed builds.
 
 ## Out of scope (deliberate)
 
