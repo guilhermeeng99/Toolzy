@@ -1,6 +1,6 @@
 [package]
 name = "toolzy"
-version = "0.1.7"
+version = "0.1.8"
 description = "Toolzy — native desktop file toolbox"
 authors = ["Guilherme Passos"]
 edition = "2021"
