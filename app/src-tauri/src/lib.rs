@@ -111,6 +111,7 @@ pub fn run() {
             pdf::pdf_to_images,
             pdf_build::images_to_pdf,
             media::convert_media,
+            download::probe_media,
             download::download_media
         ])
         .run(tauri::generate_context!())

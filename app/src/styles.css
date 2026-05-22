@@ -17,6 +17,9 @@
   --color-platinum-tint: #d4e0ed;
   --color-outline-gray: #e6e6e6;
   --color-text-black: #0a0a0a;
+  /* Semantic status colors (download/convert success + failure feedback). */
+  --color-success: #1a7f4b;
+  --color-danger: #c2362f;
 
   --font-gilroy: "Montserrat", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, sans-serif;

@@ -40,7 +40,9 @@ desktop-only native — the web build and monorepo were removed (see
 - ✅ **D — Media + downloader**: `convert_media` (ffmpeg sidecar: mp3/m4a/wav, batch) and
   `download_media` (yt-dlp sidecar, `--ffmpeg-location`, prints final path; arg builder
   cargo-tested). tauri-plugin-shell + `externalBin` + shell capability;
-  `scripts/fetch-binaries.mjs`.
+  `scripts/fetch-binaries.mjs`. **Quality picker**: `probe_media` lists available MP4
+  resolutions (with merged size) + MP3 bitrate tiers before download (`--dump-single-json`,
+  parser cargo-tested).
 - ✅ **E — Cutover + docs**: removed `apps/web`, old `apps/desktop`, `packages/*`, Turborepo,
   pnpm workspace, root vitest. Rewrote README, CLAUDE.md, all `docs/specs/*` (ADRs
   desktop-first) and this roadmap. CI = Biome + app/site builds.
@@ -55,7 +57,8 @@ desktop-only native — the web build and monorepo were removed (see
 - ⬜ First real installers: generate final icons, fetch sidecars + pdfium, `pnpm tauri build`
   per OS, publish to GitHub Releases; point the site download link at the assets.
 - ⬜ Site deploy workflow (GitHub/Cloudflare Pages).
-- ⬜ Live progress for media convert + download (stream sidecar output).
+- ⬜ Live progress for media convert (stream sidecar output). _(Download progress: ✅ done —
+  yt-dlp `--progress-template` streamed to the UI via a Tauri `Channel`.)_
 - ⬜ Rust CI job (needs Tauri Linux deps + sidecars present).
 
 ## Backlog / ideas
