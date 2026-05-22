@@ -1,7 +1,7 @@
 # Media Convert Feature Spec
 
 > **Status**: Shipped (native). Audio targets via the ffmpeg sidecar.
-> **Last updated**: 2026-05-21
+> **Last updated**: 2026-05-22
 > **Environment**: desktop (native)
 
 Convert the user's own audio/video files to audio formats using the bundled **native ffmpeg**
@@ -50,10 +50,11 @@ UI wrapper: `app/src/lib/media.ts` → `convertMedia`.
 
 ---
 
-## 4. UI (`Media` tab)
+## 4. UI (`Audio` tab → Convert mode)
 
-Choose target (mp3/m4a/wav), pick or drop audio/video files, Convert; per-file status +
-saved path. "Converted natively with ffmpeg, on your device."
+The default mode of the **Audio** tab (siblings: Trim / Volume / Speed — see
+[audio-edit](audio-edit.md)). Choose target (mp3/m4a/wav), pick or drop audio/video files,
+Convert; per-file status + saved path. "Converted natively with ffmpeg, on your device."
 
 ---
 

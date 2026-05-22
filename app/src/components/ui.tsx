@@ -15,6 +15,33 @@ export function pill(active: boolean): string {
   ].join(" ");
 }
 
+/** Centered row of segmented pill tabs — the mode switcher shared by the PDF /
+ *  Audio / Video tool tabs. */
+export function ModeTabs<T extends string>({
+  modes,
+  active,
+  onSelect,
+}: {
+  modes: readonly { id: T; label: string }[];
+  active: T;
+  onSelect: (id: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap justify-center gap-2">
+      {modes.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          className={pill(active === m.id)}
+          onClick={() => onSelect(m.id)}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Dashed drop area styling; `over` highlights during a drag. */
 export function dropzoneClass(over: boolean): string {
   return [

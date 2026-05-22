@@ -1,30 +1,24 @@
-import { open } from "@tauri-apps/plugin-dialog";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { baseName } from "../../lib/path";
-import { type PdfImageFormat, pdfToImages } from "../../lib/pdf";
+import { PDF_EXTENSIONS, type PdfImageFormat, pdfToImages } from "../../lib/pdf";
+import { useSingleFile } from "../../lib/useSingleFile";
 import { Card, Field, PrimaryButton, Slider, dropzoneClass, pill } from "../ui";
 
 /** Render each page of a chosen PDF to PNG/JPG next to the source file. */
 export function PdfToImages() {
-  const [path, setPath] = useState<string | null>(null);
   const [format, setFormat] = useState<PdfImageFormat>("png");
   const [scale, setScale] = useState(2);
   const [busy, setBusy] = useState(false);
   const [pages, setPages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-
-  async function choose() {
-    const picked = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
-    if (typeof picked === "string") {
-      setPath(picked);
+  // Clear previous render output when a new PDF is picked.
+  const { path, over, choose } = useSingleFile(
+    PDF_EXTENSIONS,
+    useCallback(() => {
       setPages([]);
       setError(null);
-    }
-  }
+    }, []),
+  );
 
   async function run() {
     if (!path) return;
@@ -64,11 +58,11 @@ export function PdfToImages() {
       <button
         type="button"
         onClick={choose}
-        className={dropzoneClass(false)}
-        aria-label="Choose a PDF"
+        className={dropzoneClass(over)}
+        aria-label="Choose or drop a PDF"
       >
         <span className="text-body-lg font-semibold text-midnight-indigo">
-          {path ? baseName(path) : "Click to choose a PDF"}
+          {path ? baseName(path) : "Drop a PDF here, or click to choose"}
         </span>
         <span className="text-body text-slate-blue">
           Pages render natively, saved next to the file

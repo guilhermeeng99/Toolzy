@@ -90,7 +90,7 @@ See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the rationale
 ```bash
 cd app
 pnpm install
-node scripts/fetch-binaries.mjs   # downloads yt-dlp + qpdf (Windows); prints where to put ffmpeg + pdfium
+node scripts/fetch-binaries.mjs   # auto-fetches yt-dlp, ffmpeg, pdfium (+ qpdf on Windows; mac/Linux install qpdf via a package manager)
 pnpm tauri dev                    # run the desktop app
 ```
 
@@ -119,7 +119,7 @@ pnpm dev      # preview · pnpm build → static dist/
 pnpm build                                         # tsc --noEmit + vite build
 cargo test --manifest-path src-tauri/Cargo.toml    # Rust unit tests
 # from repo root
-pnpm dlx @biomejs/biome ci .                        # lint + format
+pnpm dlx @biomejs/biome@1.9.4 ci .                  # lint + format (pin matches CI)
 ```
 
 ## License

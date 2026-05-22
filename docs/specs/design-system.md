@@ -57,15 +57,15 @@ Light theme. Use the Tailwind utility, never the raw hex.
 | `cloud-mist` | `#F8F9FB` | Off-white section backgrounds. |
 | `snow-white` | `#ffffff` | Page background, card surfaces. |
 | `text-black` | `#0A0A0A` | General body text / default links (never pure `#000`). |
-| `lavender-glow` | `#e55cff` | Decorative accent (abstract shapes, illustration). |
-| `royal-amethyst` | `#8247f5` | Decorative accent. |
-| `ocean-glimmer` | `#BB32D5` | Decorative accent. |
-| `sunset-gold` | `#ffa600` | Decorative accent (warmth). |
-| `skybound-blue` | `#0099ff` | Decorative accent. |
+| `success` | `#1a7f4b` | Success feedback (download/convert saved). Semantic status token. |
+| `danger` | `#c2362f` | Failure feedback (errors). Semantic status token. |
+| `lavender-glow` | `#e55cff` | Decorative accent — **site only** (hero shapes). |
+| `skybound-blue` | `#0099ff` | Decorative accent — **site only** (hero shapes). |
 
-Rule: the five vibrant accents (`lavender-glow`, `royal-amethyst`, `ocean-glimmer`,
-`sunset-gold`, `skybound-blue`) are for **graphics/illustration only** — never for text
-blocks or as a second CTA color.
+Rule: the decorative accents (`lavender-glow`, `skybound-blue` — defined in
+`site/src/styles.css` only) are for **graphics/illustration only**, never for text blocks or as
+a second CTA color. The wider Calendly reference palette (royal-amethyst, ocean-glimmer,
+sunset-gold, …) is **not tokenized** in code — add a `@theme` token before using one.
 
 ---
 
@@ -165,8 +165,9 @@ underline or color shift on hover.
 - **Container**: max-width centered (app `max-w-[1000px]`, site `max-w-[1100px]`), horizontal
   padding `px-6` (24px). Background `snow-white`; alternating sections may use `cloud-mist`.
 - **Header**: sticky top bar, `bg-snow-white/90` + backdrop blur, hairline
-  `border-b border-outline-gray`. Currently **minimal — just the Toolzy logo** (left). Nav and
-  a right-aligned CTA ("Get the desktop app") can return once there are more destinations.
+  `border-b border-outline-gray`. App: logo + a `native` badge, tool-tab pills, and a version /
+  "Update to vX" button (right). Site: logo (left), section nav (Features, GitHub), and a
+  right-aligned **Download** CTA.
 - **Hero**: large centered (or left) headline (`text-display-lg`, `font-bold`,
   `text-midnight-indigo`), supporting paragraph (`text-subheading`, `text-slate-blue`), a
   primary CTA, optionally a floating product card with abstract accent shapes behind it.

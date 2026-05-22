@@ -70,15 +70,18 @@ struct DownloadProgress { percent: f64, downloaded: u64, total: Option<u64> }
 
 - Both validate `url` is http(s) before spawning. `probe_media` returns the stderr tail on a
   non-zero exit (blocked/private/removed); `download_media` resolves Downloads via
-  `app.path().download_dir()`, streams stderr → `parse_progress` → `on_progress`, and returns
-  the saved path (stdout) or the stderr tail on a non-zero `Terminated` code.
+  `app.path().download_dir()`, streams yt-dlp's **stdout** lines (the progress template + the
+  final `--print` path) → `parse_progress` / path, keeps the last stderr line for the error
+  message, and returns the saved path or the stderr tail on a non-zero `Terminated` code.
 - Pure, cargo-tested: `parse_probe` (JSON → `MediaProbe`, dedupes height keeping the largest
   estimate, adds best-audio size), `build_ytdlp_args` (height cap + audio bitrate + progress
   flags), and `parse_progress` (`PROG|` line → percent, estimate fallback).
 
 `yt-dlp` and `ffmpeg` are declared as `externalBin` in `tauri.conf.json` and allowed by scoped
-`shell:allow-execute` **and `shell:allow-spawn`** capabilities (`args: true`); placed in
-`app/src-tauri/binaries/` (per-target-triple suffix) by `scripts/fetch-binaries.mjs`.
+shell capabilities (`args: true`): both get `shell:allow-execute`; **only `yt-dlp`** also gets
+`shell:allow-spawn` (the download streams progress via `spawn`, while every ffmpeg call uses
+`output`). Binaries are placed in `app/src-tauri/binaries/` (per-target-triple suffix) by
+`scripts/fetch-binaries.mjs`.
 
 UI wrappers: `app/src/lib/media.ts` → `probeMedia`, `downloadMedia` (optional `onProgress`
 callback wired to a `Channel`), `MP3_BITRATES`, `mp3SizeEstimate`.

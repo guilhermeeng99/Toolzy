@@ -6,7 +6,7 @@
 
 Edit the user's own audio (or the audio of a media file) with the bundled **native ffmpeg**
 sidecar: **trim** to a time range, change the **volume**, or change the **speed**. Lives as
-modes inside the **Media** tab, alongside the existing audio Convert. Distinct from the
+modes inside the **Audio** tab, alongside the existing audio Convert. Distinct from the
 downloader (fetches from a link) and from video editing (the Video tab).
 
 **Scope decisions** (locked at design time):
@@ -111,7 +111,7 @@ Idle (drop zone) → Picked (file + controls) → Working(busy) → Done(saved p
   speed slider) + a primary action button.
 - **Done / Error**: one line — `Saved: <path>` or `Failed: <stderr tail>`.
 
-Lives under the **Media** tab's mode pills: **Convert · Trim · Volume · Speed**.
+Lives under the **Audio** tab's mode pills: **Convert · Trim · Volume · Speed**.
 
 ---
 

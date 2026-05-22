@@ -49,6 +49,8 @@ jobs:
       # red test blocks publishing. tauri-build validates externalBin + pdfium, so
       # the binaries must be present; `generate_context!` embeds `dist` (built above).
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -56,6 +58,9 @@ jobs:
 
       - name: Fetch bundled binaries (yt-dlp, ffmpeg, pdfium)
         run: node app/scripts/fetch-binaries.mjs
+
+      - name: Clippy (Rust lints, warnings = errors)
+        run: cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings
 
       - name: Cargo test (Rust engine)
         run: cargo test --manifest-path app/src-tauri/Cargo.toml

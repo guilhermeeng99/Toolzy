@@ -320,11 +320,9 @@ pub async fn download_media(
                     }
                 }
             }
-            CommandEvent::Terminated(payload) => {
-                if payload.code != Some(0) {
-                    let reason = if error_tail.is_empty() { "unknown error" } else { &error_tail };
-                    return Err(format!("Download failed. {reason}"));
-                }
+            CommandEvent::Terminated(payload) if payload.code != Some(0) => {
+                let reason = if error_tail.is_empty() { "unknown error" } else { &error_tail };
+                return Err(format!("Download failed. {reason}"));
             }
             _ => {}
         }

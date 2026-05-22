@@ -1,18 +1,17 @@
 # PDF Tools Feature Spec
 
-> **Status**: PDF→images + Images→PDF shipped (native). Merge / Compress / Protect / Unlock
-> in progress (this change).
+> **Status**: Shipped (native). PDF→images · Images→PDF · Merge · Compress · Protect · Unlock.
 > **Last updated**: 2026-05-22
 > **Environment**: desktop (native)
 
 Six related tools, all native and on-device, grouped under the **PDF** tab:
 
-1. **PDF to images** — render each page to a PNG or JPG. _(shipped)_
-2. **Images to PDF** — combine images into one multi-page PDF, user-ordered. _(shipped; +reorder)_
-3. **Merge PDFs** — concatenate several PDFs into one, user-ordered. _(new)_
-4. **Compress PDF** — shrink a PDF by re-rasterizing pages at a chosen level. _(new)_
-5. **Protect PDF** — add an open password (AES-256). _(new)_
-6. **Unlock PDF** — remove a known password. _(new)_
+1. **PDF to images** — render each page to a PNG or JPG.
+2. **Images to PDF** — combine images into one multi-page PDF, user-ordered (drag-reorder + rotate).
+3. **Merge PDFs** — concatenate several PDFs into one, user-ordered.
+4. **Compress PDF** — shrink a PDF by re-rasterizing pages at a chosen level.
+5. **Protect PDF** — add an open password (AES-256).
+6. **Unlock PDF** — remove a known password.
 
 **Scope decisions** (locked at design time):
 
@@ -163,12 +162,12 @@ The **PDF** tab is a mode switcher (pills): _PDF→images · Images→PDF · Mer
 Protect · Unlock_. Each mode is its own component under `components/pdf/`.
 
 ```
-Idle → (pick / drop) → Ready → Running(busy) → Done(result + open-folder) | Error(message)
+Idle → (pick / drop) → Ready → Running(busy) → Done(saved path) | Error(message)
 ```
 
 - **Preview grid** (Images→PDF, Merge): a thumbnail card per file (image / PDF first page via
   `make_thumbnail`) with an order badge; **pointer-drag to reorder** (dnd-kit), hover to rotate
-  (images) / remove; a toolbar adds files, sorts A–Z, clears. Empty state is the drop zone.
+  (images) / remove; a toolbar adds files and clears. Empty state is the drop zone.
   Images→PDF adds a right-side **options panel** (page size, orientation, margin, merge toggle).
 - **Compress**: level pills + before/after size with delta (`formatBytes` / `sizeDelta`).
 - **Protect / Unlock**: a password field (required) + save dialog.

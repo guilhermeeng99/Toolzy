@@ -27,18 +27,23 @@ natively); the **React + TypeScript (Vite)** UI is a thin webview front-end. See
 ```
 app/
   src/                # React + TS UI (Vite). Presentation only.
-    components/        #   tools (ImageTool, PdfTool, MediaTool, DownloadTool) + shared ui.tsx
+    components/        #   tools (ImageTool, PdfTool, MediaTool, VideoTool, DownloadTool)
+                       #     + pdf/ media/ video/ submodes, EditPanel, TimeRange, shared ui.tsx
     lib/               #   invoke() wrappers + shared hooks/helpers (convert, pdf, media,
-                       #     format, path, update, useFileDrop, useBatchQueue)
+                       #     audioEdit, videoEdit, format, path, time, update, useFileDrop,
+                       #     useBatchQueue, useFileEdit, useSingleFile, useTrim, usePdfItems)
   src-tauri/          # Rust = the engine
     src/
       lib.rs           #   Tauri builder + command registry
-      image_convert.rs #   image engine: convert_image command + resize/naming helpers + tests
-      pdf.rs / pdf_build.rs   #   pdfium render / printpdf build
-      media.rs / download.rs  #   ffmpeg + yt-dlp sidecar commands (download has unit tests)
+      image_convert.rs #   image engine: convert_image + resize/naming helpers + tests
+      pdf*.rs          #   pdf (pdfium render) · pdf_build/pdf_compress (printpdf) ·
+                       #     pdf_merge/pdf_protect (qpdf) + qpdf.rs runner + thumbnail.rs
+      ffmpeg.rs        #   shared sidecar plumbing (run_ffmpeg, with_suffix, atempo_chain)
+      media.rs / download.rs  #   ffmpeg convert + yt-dlp download sidecars (cargo-tested)
+      audio_edit.rs / video_edit.rs  #   ffmpeg edits: trim/volume/speed/merge/… (cargo-tested)
     capabilities/      #   Tauri permissions (dialog, shell sidecar allow-list)
-    tauri.conf.json    #   externalBin (yt-dlp, ffmpeg), bundle, window
-    scripts/fetch-binaries.mjs  # fetch yt-dlp; print ffmpeg/pdfium instructions
+    tauri.conf.json    #   externalBin (yt-dlp, ffmpeg, qpdf), pdfium resource, bundle, window
+  scripts/fetch-binaries.mjs  # auto-fetch yt-dlp/ffmpeg/pdfium (+ qpdf on Windows)
 site/                 # static landing/download page (Vite + Tailwind)
 docs/specs/           # per-feature contracts + architecture.md (ADRs)
 docs/ROADMAP.md       # done / doing / planned
@@ -49,8 +54,9 @@ Layer rules:
 - **Rust (`src-tauri`)** owns conversion + the native libs/sidecars. Keep pure, testable
   logic (resize math, filename/arg building) in its own module with `#[cfg(test)]` tests.
 - **React (`src`)** never converts. A component calls a `lib/*` wrapper → a Rust command.
-- Native binaries (`ffmpeg`, `yt-dlp`) are **sidecars** (`externalBin` + a `shell:allow-execute`
-  capability scoped to them). `pdfium` is a runtime-loaded dynamic library. Compiled-in crates
+- Native binaries (`ffmpeg`, `yt-dlp`, `qpdf`) are **sidecars** (`externalBin` + a
+  `shell:allow-execute` capability scoped to them; `yt-dlp` also has `shell:allow-spawn` for
+  streamed download progress). `pdfium` is a runtime-loaded dynamic library. Compiled-in crates
   (`image`, `webp`, `printpdf`) need no external binary.
 
 ---
@@ -127,7 +133,7 @@ Rules:
 | UI | React + TypeScript (`strict`) + Vite |
 | Styling | Tailwind CSS v4 (`@tailwindcss/vite`) |
 | Image | `image` crate (png/jpg/gif/bmp/tiff) + `webp` (libwebp); AVIF/JXL planned |
-| PDF | `pdfium-render` (read) + `printpdf` (write). **No MuPDF** (AGPL) |
+| PDF | `pdfium-render` (read) + `printpdf` (write) + `qpdf` sidecar (merge/encrypt/decrypt). **No MuPDF/Ghostscript** (AGPL) |
 | Media | native `ffmpeg` via Tauri sidecar |
 | Download | `yt-dlp` via Tauri sidecar |
 | Dialogs / drag-drop | `@tauri-apps/plugin-dialog` + webview drag-drop (native paths) |
@@ -146,11 +152,11 @@ pnpm install
 pnpm tauri dev        # run the desktop app (Vite + Tauri)
 pnpm build            # tsc --noEmit + vite build
 pnpm tauri build      # installer for the current OS (needs icons + sidecar binaries)
-node scripts/fetch-binaries.mjs   # fetch yt-dlp; print ffmpeg/pdfium placement
+node scripts/fetch-binaries.mjs   # auto-fetch yt-dlp/ffmpeg/pdfium (+ qpdf on Windows)
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests
 
 # repo root
-pnpm dlx @biomejs/biome ci .       # lint + format (CI parity)
+pnpm dlx @biomejs/biome@1.9.4 ci .   # lint + format (pin matches CI)
 ```
 
 > Run Biome via `pnpm dlx` (or `pnpm exec` inside a project) — there is no root `node_modules`.
@@ -165,7 +171,7 @@ After every change:
 
 1. `cargo test` (if Rust touched) — green; new pure logic has tests, bug fixes get a regression test.
 2. `pnpm build` in `app/` (and `site/` if touched) — tsc + Vite green.
-3. `pnpm dlx @biomejs/biome ci .` — zero errors.
+3. `pnpm dlx @biomejs/biome@1.9.4 ci .` — zero errors (pin matches CI).
 4. Touched a feature's behavior? Update its spec in `docs/specs/` in the same change.
 5. Shipped/started/finished a roadmap item? Update `docs/ROADMAP.md`.
 
@@ -185,8 +191,9 @@ Edge cases, Testing checklist, Out of scope. Keep spec and code in sync.
 - Native features ship as **sidecars** (separate processes), keeping the MIT license clean.
 - A command that shells out maps a non-zero exit to an `Err(String)` (stderr tail). yt-dlp
   gets `--ffmpeg-location <exe dir>` so it finds the bundled ffmpeg off-PATH.
-- Sidecars/pdfium are fetched by `scripts/fetch-binaries.mjs` (yt-dlp auto; ffmpeg + pdfium
-  printed) and gitignored under `src-tauri/binaries`.
+- Sidecars/pdfium are auto-fetched by `app/scripts/fetch-binaries.mjs` (yt-dlp/ffmpeg/pdfium on
+  all platforms; qpdf on Windows — other OSes install it via a package manager) and gitignored
+  under `src-tauri/binaries` + `src-tauri/pdfium`.
 - Icons live in `src-tauri/icons` (`pnpm tauri icon <png>`). The current set is a placeholder.
 
 ---

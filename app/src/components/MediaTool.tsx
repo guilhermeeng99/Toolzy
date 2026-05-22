@@ -3,7 +3,7 @@ import { AudioSpeed } from "./media/AudioSpeed";
 import { AudioVolume } from "./media/AudioVolume";
 import { ConvertAudio } from "./media/ConvertAudio";
 import { TrimAudio } from "./media/TrimAudio";
-import { pill } from "./ui";
+import { ModeTabs } from "./ui";
 
 type Mode = "convert" | "trim" | "volume" | "speed";
 
@@ -25,18 +25,7 @@ export function MediaTool() {
   const [mode, setMode] = useState<Mode>("convert");
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-center gap-2">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={pill(mode === m.id)}
-            onClick={() => setMode(m.id)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+      <ModeTabs modes={MODES} active={mode} onSelect={setMode} />
       <ModeView mode={mode} />
     </div>
   );

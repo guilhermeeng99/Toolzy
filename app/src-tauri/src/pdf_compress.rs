@@ -66,17 +66,19 @@ pub fn compress_pdf(
             .into_rgb8();
         let (px_w, px_h) = (rgb.width() as usize, rgb.height() as usize);
         let jpeg = encode_jpeg(&rgb, quality)?;
+        // Page is sized from the source; the render scale maps px back at 72*scale dpi.
+        let transform = ImageTransform { dpi: Some(72.0 * scale), ..Default::default() };
 
         match &out {
             None => {
                 let (doc_ref, p, l) =
                     printpdf::PdfDocument::new("Toolzy", Mm(w_mm), Mm(h_mm), "Layer 1");
-                draw_jpeg(&doc_ref, p, l, px_w, px_h, jpeg, scale);
+                embed_jpeg(&doc_ref, p, l, px_w, px_h, jpeg, transform);
                 out = Some(doc_ref);
             }
             Some(doc_ref) => {
                 let (p, l) = doc_ref.add_page(Mm(w_mm), Mm(h_mm), "Layer 1");
-                draw_jpeg(doc_ref, p, l, px_w, px_h, jpeg, scale);
+                embed_jpeg(doc_ref, p, l, px_w, px_h, jpeg, transform);
             }
         }
     }
@@ -101,16 +103,17 @@ pub(crate) fn encode_jpeg(rgb: &image::RgbImage, quality: u8) -> Result<Vec<u8>,
     Ok(buf)
 }
 
-/// Place pre-encoded JPEG bytes onto a page as a DCTDecode image XObject. The image
-/// is `px_w`×`px_h`; at dpi `72 * scale` it fills the page sized from the source.
-fn draw_jpeg(
+/// Place pre-encoded JPEG bytes (`px_w`×`px_h`) onto a page as a DCTDecode image
+/// XObject with `transform`. Shared by compress (dpi from the render scale) and
+/// images→PDF (`pdf_build`, dpi/translate from the page fit).
+pub(crate) fn embed_jpeg(
     doc: &PdfDocumentReference,
     page: PdfPageIndex,
     layer: PdfLayerIndex,
     px_w: usize,
     px_h: usize,
     jpeg: Vec<u8>,
-    scale: f32,
+    transform: ImageTransform,
 ) {
     let xobject = ImageXObject {
         width: Px(px_w),
@@ -123,8 +126,7 @@ fn draw_jpeg(
         clipping_bbox: None,
         smask: None,
     };
-    let current = doc.get_page(page).get_layer(layer);
-    Image::from(xobject).add_to_layer(current, ImageTransform { dpi: Some(72.0 * scale), ..Default::default() });
+    Image::from(xobject).add_to_layer(doc.get_page(page).get_layer(layer), transform);
 }
 
 #[cfg(test)]

@@ -2,13 +2,10 @@ use std::io::BufWriter;
 use std::path::Path;
 
 use image::DynamicImage;
-use printpdf::{
-    ColorBits, ColorSpace, Image, ImageFilter, ImageTransform, ImageXObject, Mm,
-    PdfDocumentReference, PdfLayerIndex, PdfPageIndex, Px,
-};
+use printpdf::{ImageTransform, Mm, PdfDocumentReference};
 use serde::Deserialize;
 
-use crate::pdf_compress::encode_jpeg;
+use crate::pdf_compress::{embed_jpeg, encode_jpeg};
 
 // 1 px at 72 dpi -> mm — used to size a page to its image in "fit" mode.
 const MM_PER_PX: f32 = 25.4 / 72.0;
@@ -82,12 +79,12 @@ fn build_doc(
             None => {
                 let (doc, p, l) =
                     printpdf::PdfDocument::new("Toolzy", Mm(page_w), Mm(page_h), "Layer 1");
-                draw(&doc, p, l, pw, ph, jpeg, transform);
+                embed_jpeg(&doc, p, l, pw as usize, ph as usize, jpeg, transform);
                 out = Some(doc);
             }
             Some(doc) => {
                 let (p, l) = doc.add_page(Mm(page_w), Mm(page_h), "Layer 1");
-                draw(doc, p, l, pw, ph, jpeg, transform);
+                embed_jpeg(doc, p, l, pw as usize, ph as usize, jpeg, transform);
             }
         }
     }
@@ -124,30 +121,6 @@ fn place(img_w: u32, img_h: u32, page_w: f32, page_h: f32, margin: f32, fixed: b
         dpi: Some(img_w as f32 * 25.4 / dw),
         ..Default::default()
     }
-}
-
-fn draw(
-    doc: &PdfDocumentReference,
-    page: PdfPageIndex,
-    layer: PdfLayerIndex,
-    w: u32,
-    h: u32,
-    jpeg: Vec<u8>,
-    transform: ImageTransform,
-) {
-    let xobject = ImageXObject {
-        width: Px(w as usize),
-        height: Px(h as usize),
-        color_space: ColorSpace::Rgb,
-        bits_per_component: ColorBits::Bit8,
-        interpolate: true,
-        image_data: jpeg,
-        image_filter: Some(ImageFilter::DCT),
-        clipping_bbox: None,
-        smask: None,
-    };
-    let current = doc.get_page(page).get_layer(layer);
-    Image::from(xobject).add_to_layer(current, transform);
 }
 
 fn save_doc(doc: PdfDocumentReference, out_path: &str) -> Result<(), String> {

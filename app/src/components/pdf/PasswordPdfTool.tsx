@@ -1,7 +1,8 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useCallback, useState } from "react";
-import { baseName, extOf, stripExt } from "../../lib/path";
-import { useFileDrop } from "../../lib/useFileDrop";
+import { baseName, stripExt } from "../../lib/path";
+import { PDF_EXTENSIONS } from "../../lib/pdf";
+import { useSingleFile } from "../../lib/useSingleFile";
 import { Card, Field, PasswordInput, PrimaryButton, dropzoneClass } from "../ui";
 
 /** Shared shell for the password modes (Protect / Unlock): pick one PDF, enter a
@@ -21,34 +22,14 @@ export function PasswordPdfTool({
   passwordLabel: string;
   run: (path: string, password: string, outPath: string) => Promise<string>;
 }) {
-  const [path, setPath] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-
-  const pick = useCallback((p: string) => {
-    setPath(p);
-    setStatus(null);
-  }, []);
-
-  const over = useFileDrop(
-    useCallback(
-      (incoming: string[]) => {
-        const pdf = incoming.find((p) => extOf(p) === "pdf");
-        if (pdf) pick(pdf);
-      },
-      [pick],
-    ),
+  // Clear the last result when a new file is picked.
+  const { path, over, choose } = useSingleFile(
+    PDF_EXTENSIONS,
+    useCallback(() => setStatus(null), []),
   );
-
-  async function choose() {
-    const picked = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
-    if (typeof picked === "string") pick(picked);
-  }
 
   async function go() {
     if (!path || !password) return;

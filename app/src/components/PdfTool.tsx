@@ -5,7 +5,7 @@ import { MergePdfs } from "./pdf/MergePdfs";
 import { PdfToImages } from "./pdf/PdfToImages";
 import { ProtectPdf } from "./pdf/ProtectPdf";
 import { UnlockPdf } from "./pdf/UnlockPdf";
-import { pill } from "./ui";
+import { ModeTabs } from "./ui";
 
 type Mode = "to-images" | "to-pdf" | "merge" | "compress" | "protect" | "unlock";
 
@@ -31,18 +31,7 @@ export function PdfTool() {
   const [mode, setMode] = useState<Mode>("to-images");
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-center gap-2">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={pill(mode === m.id)}
-            onClick={() => setMode(m.id)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+      <ModeTabs modes={MODES} active={mode} onSelect={setMode} />
       <ModeView mode={mode} />
     </div>
   );

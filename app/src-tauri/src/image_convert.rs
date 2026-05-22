@@ -133,8 +133,7 @@ fn round_min1(v: f32) -> u32 {
 /// Output path = source directory + base name + new extension.
 pub fn output_path(src: &Path, target: &str) -> PathBuf {
     let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
-    let ext = if target == "jpg" { "jpg" } else { target };
-    src.with_file_name(format!("{stem}.{ext}"))
+    src.with_file_name(format!("{stem}.{target}"))
 }
 
 #[cfg(test)]

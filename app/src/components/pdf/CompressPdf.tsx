@@ -1,9 +1,14 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useCallback, useState } from "react";
 import { formatBytes, sizeDelta } from "../../lib/format";
-import { baseName, extOf, stripExt } from "../../lib/path";
-import { type CompressLevel, type CompressResult, compressPdf } from "../../lib/pdf";
-import { useFileDrop } from "../../lib/useFileDrop";
+import { baseName, stripExt } from "../../lib/path";
+import {
+  type CompressLevel,
+  type CompressResult,
+  PDF_EXTENSIONS,
+  compressPdf,
+} from "../../lib/pdf";
+import { useSingleFile } from "../../lib/useSingleFile";
 import { Card, Field, PrimaryButton, dropzoneClass, pill } from "../ui";
 
 const LEVELS: { id: CompressLevel; label: string }[] = [
@@ -14,36 +19,18 @@ const LEVELS: { id: CompressLevel; label: string }[] = [
 
 /** Shrink a single PDF by re-rasterizing its pages at a chosen level. */
 export function CompressPdf() {
-  const [path, setPath] = useState<string | null>(null);
   const [level, setLevel] = useState<CompressLevel>("balanced");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CompressResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const pickPath = useCallback((p: string) => {
-    setPath(p);
-    setResult(null);
-    setError(null);
-  }, []);
-
-  const over = useFileDrop(
-    useCallback(
-      (incoming: string[]) => {
-        const pdf = incoming.find((p) => extOf(p) === "pdf");
-        if (pdf) pickPath(pdf);
-      },
-      [pickPath],
-    ),
+  // Clear the previous result when a new file is picked.
+  const { path, over, choose } = useSingleFile(
+    PDF_EXTENSIONS,
+    useCallback(() => {
+      setResult(null);
+      setError(null);
+    }, []),
   );
-
-  async function choose() {
-    const picked = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
-    if (typeof picked === "string") pickPath(picked);
-  }
 
   async function run() {
     if (!path) return;

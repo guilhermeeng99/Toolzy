@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { pill } from "./ui";
+import { ModeTabs } from "./ui";
 import { AddAudio } from "./video/AddAudio";
 import { MergeVideos } from "./video/MergeVideos";
 import { MirrorVideo } from "./video/MirrorVideo";
@@ -31,18 +31,7 @@ export function VideoTool() {
   const [mode, setMode] = useState<Mode>("trim");
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-center gap-2">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={pill(mode === m.id)}
-            onClick={() => setMode(m.id)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+      <ModeTabs modes={MODES} active={mode} onSelect={setMode} />
       <ModeView mode={mode} />
     </div>
   );

@@ -53,7 +53,7 @@ async fn mirror_video(app, path: String, direction: String) -> Result<String, St
 async fn change_video_speed(app, path: String, factor: f64) -> Result<String, String>;
 
 // pure, unit-tested arg/filter builders
-fn video_trim_args / merge_args / add_audio_args / rotate_args / mirror_args / video_speed_args;
+fn video_trim_args / merge_args / add_audio_args / filter_args (shared by rotate+mirror) / video_speed_args;
 fn concat_list(paths: &[String]) -> String;  // ffmpeg concat-demuxer list-file body
 fn rotate_filter(degrees: u32) -> Option<String>;
 fn mirror_filter(direction: &str) -> Option<&str>;

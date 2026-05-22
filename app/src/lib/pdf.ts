@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 export type PdfImageFormat = "png" | "jpg";
 export type CompressLevel = "light" | "balanced" | "strong";
 
+/** Single source extension for the PDF tools (stable ref for `useSingleFile`). */
+export const PDF_EXTENSIONS = ["pdf"] as const;
+
 /** Output path + source/result byte sizes from a compress run. */
 export interface CompressResult {
   path: string;
