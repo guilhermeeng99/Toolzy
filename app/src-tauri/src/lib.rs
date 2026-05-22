@@ -3,6 +3,11 @@ mod image_convert;
 mod media;
 mod pdf;
 mod pdf_build;
+mod pdf_compress;
+mod pdf_merge;
+mod pdf_protect;
+mod qpdf;
+mod thumbnail;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +20,11 @@ pub fn run() {
             image_convert::convert_image,
             pdf::pdf_to_images,
             pdf_build::images_to_pdf,
+            pdf_compress::compress_pdf,
+            thumbnail::make_thumbnail,
+            pdf_merge::merge_pdfs,
+            pdf_protect::add_pdf_password,
+            pdf_protect::remove_pdf_password,
             media::convert_media,
             download::probe_media,
             download::download_media

@@ -22,7 +22,8 @@ const TOOL_META: Record<Tool, { title: string; description: string }> = {
   },
   pdf: {
     title: "PDF tools",
-    description: "Render PDF pages to images, or combine images into a PDF — all native.",
+    description:
+      "Convert, merge, compress, and password-protect PDFs — all native, all on your machine.",
   },
   media: {
     title: "Media converter",

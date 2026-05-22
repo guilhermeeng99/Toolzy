@@ -44,10 +44,12 @@
     ],
     "externalBin": [
       "binaries/yt-dlp",
-      "binaries/ffmpeg"
+      "binaries/ffmpeg",
+      "binaries/qpdf"
     ],
-    "resources": [
-      "pdfium/*"
-    ]
+    "resources": {
+      "pdfium/*": "pdfium/",
+      "binaries/*.dll": ""
+    }
   }
 }

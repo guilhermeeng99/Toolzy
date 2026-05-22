@@ -1,8 +1,8 @@
 # Toolzy
 
 A free, open-source, **native desktop** toolbox for everyday file tasks: convert images,
-turn PDFs into images (and images into PDFs), convert your own audio/video, and download
-audio/video from a link — all on your own machine.
+work with PDFs (images ↔ PDF, merge, compress, password), convert your own audio/video, and
+download audio/video from a link — all on your own machine.
 
 **The promise:** your files never leave your device. Conversion runs **natively** (Rust +
 bundled binaries), not in a browser sandbox — fast, reliable, no upload, no account, no server.
@@ -17,8 +17,9 @@ Status: ✅ done · 🚧 in progress · ⬜ planned. See [`docs/ROADMAP.md`](doc
 | Feature | Status | Engine |
 |---|---|---|
 | Image convert + resize (PNG/JPG/WebP/GIF/BMP/TIFF), batch, drag-drop | ✅ | Rust `image` + `webp` |
-| PDF → images (per page) | ✅ | `pdfium-render` |
-| Images → PDF | ✅ | `printpdf` |
+| PDF → images (per page) · images → PDF | ✅ | `pdfium-render` · `printpdf` |
+| PDF merge · compress (lossy) | ✅ | `qpdf` · `pdfium`+`printpdf` |
+| PDF protect · unlock (AES-256 password) | ✅ | `qpdf` sidecar |
 | Media convert (MP4 → MP3, M4A, WAV) | ✅ | `ffmpeg` sidecar |
 | Media downloader (link → MP4 / MP3) | ✅ | `yt-dlp` + `ffmpeg` sidecars |
 | AVIF / JPEG-XL image output | ⬜ | `ravif` / `jpegxl-rs` |
@@ -72,7 +73,7 @@ Layering:
 | UI | React + TypeScript + Vite |
 | Styling | Tailwind CSS v4 |
 | Image | `image` crate (+ `webp`/libwebp); AVIF/JXL planned |
-| PDF | `pdfium-render` (read) · `printpdf` (write) — **no MuPDF** (AGPL) |
+| PDF | `pdfium-render` (read) · `printpdf` (write) · `qpdf` (merge/encrypt, sidecar) — **no MuPDF/Ghostscript** (AGPL) |
 | Media | native `ffmpeg` (sidecar) |
 | Download | `yt-dlp` (sidecar) |
 | Package manager | pnpm (each of `app/`, `site/` is standalone) |
@@ -89,7 +90,7 @@ See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the rationale
 ```bash
 cd app
 pnpm install
-node scripts/fetch-binaries.mjs   # downloads yt-dlp; prints where to put ffmpeg + pdfium
+node scripts/fetch-binaries.mjs   # downloads yt-dlp + qpdf (Windows); prints where to put ffmpeg + pdfium
 pnpm tauri dev                    # run the desktop app
 ```
 
@@ -125,8 +126,8 @@ pnpm dlx @biomejs/biome ci .                        # lint + format
 
 App code: **MIT** (see `LICENSE`). Bundled binaries keep their own licenses and run as
 **separate processes** (sidecars) or dynamically-loaded libraries, so they don't change the
-app's license: `ffmpeg` (LGPL/GPL build), `yt-dlp` (Unlicense), `pdfium` (BSD-3). Do not
-bundle AGPL libraries — see [ADR-005](docs/specs/architecture.md#adr-005-library--license-choices).
+app's license: `ffmpeg` (LGPL/GPL build), `yt-dlp` (Unlicense), `pdfium` (BSD-3), `qpdf`
+(Apache-2.0). Do not bundle AGPL libraries — see [ADR-005](docs/specs/architecture.md#adr-005-library--license-choices).
 
 ## Legal note
 

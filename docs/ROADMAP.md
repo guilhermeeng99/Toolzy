@@ -21,7 +21,7 @@ desktop-only native — the web build and monorepo were removed (see
 |---|---|---|
 | A | Image PoC (native scaffold) | ✅ Done |
 | B | Image full (formats, batch, drag-drop) | 🚧 webp + gif/bmp/tiff done; AVIF/JXL planned |
-| C | PDF native (pdfium / printpdf) | ✅ Done |
+| C | PDF tools (pdfium / printpdf / qpdf) | ✅ Done |
 | D | Media + downloader (ffmpeg / yt-dlp) | ✅ Done |
 | E | Cutover + full docs refresh | ✅ Done |
 | F | Landing site | ✅ Done |
@@ -36,8 +36,11 @@ desktop-only native — the web build and monorepo were removed (see
 - 🚧 **B — Image full**: ✅ webp (libwebp) + gif/bmp/tiff; ✅ batch + native OS drag-drop;
   ✅ before/after size + delta. ⬜ AVIF (`ravif`/rav1e) + JPEG-XL (`jpegxl-rs`/libjxl) —
   heavy native encoders, deferred.
-- ✅ **C — PDF native**: `pdf_to_images` (pdfium-render) + `images_to_pdf` (printpdf);
-  two-mode PDF UI; shared `ui.tsx`. Runtime needs the pdfium library beside the exe.
+- ✅ **C — PDF tools**: `pdf_to_images` (pdfium-render) + `images_to_pdf` (printpdf), plus
+  **merge** (`merge_pdfs`), **compress** (`compress_pdf` — rasterize at a level, lossy),
+  **protect/unlock** (`add_pdf_password` / `remove_pdf_password`) via the **qpdf** sidecar
+  (Apache-2.0; arg builders cargo-tested). Six-mode PDF UI with drag-to-reorder lists; shared
+  `ui.tsx`. Needs pdfium beside the exe + the qpdf sidecar. See [ADR-009](specs/architecture.md#adr-009-qpdf-sidecar-for-pdf-merge--encryption).
 - ✅ **D — Media + downloader**: `convert_media` (ffmpeg sidecar: mp3/m4a/wav, batch) and
   `download_media` (yt-dlp sidecar, `--ffmpeg-location`, prints final path; arg builder
   cargo-tested). tauri-plugin-shell + `externalBin` + shell capability;
@@ -68,7 +71,8 @@ desktop-only native — the web build and monorepo were removed (see
 ## Backlog / ideas
 
 - 💡 Image: crop/rotate, background removal, watermark, EXIF strip.
-- 💡 PDF: compress, split/merge, reorder, password add/remove.
+- ✅ PDF: compress, merge, reorder, password add/remove _(shipped — Phase C)_. ⬜ Remaining:
+  **split** (extract page ranges), page-level reorder, lossless "keep text" compress.
 - 💡 Video transcode (mp4 → webm/gif, trim, resize) via native ffmpeg.
 - 💡 In-app save-folder picker; reorder/drag in batch lists.
 

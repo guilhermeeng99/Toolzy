@@ -29,6 +29,12 @@ const TARGETS = {
       url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-win-x64.tgz",
       member: "pdfium.dll",
     },
+    // qpdf (Apache-2.0) — PDF merge / encrypt / decrypt. The MSVC zip ships
+    // qpdf.exe plus a few sibling DLLs; both are placed in binaries/.
+    qpdf: {
+      url: "https://github.com/qpdf/qpdf/releases/download/v12.2.0/qpdf-12.2.0-msvc64.zip",
+      member: "qpdf.exe",
+    },
   },
   "linux-x64": {
     triple: "x86_64-unknown-linux-gnu",
@@ -96,6 +102,26 @@ async function findFile(dir, name) {
   return null;
 }
 
+/** qpdf ships as qpdf.exe + sibling DLLs. Copy the exe as the sidecar and every
+ *  DLL beside it, so qpdf.exe finds its libs at dev time (`shell().sidecar`). */
+async function fetchQpdf({ url, member }, exeDest) {
+  const tmp = join(srcTauri, ".fetch-tmp-qpdf");
+  await rm(tmp, { recursive: true, force: true });
+  await mkdir(tmp, { recursive: true });
+  const archive = join(tmp, "archive");
+  await download(url, archive);
+  execFileSync("tar", ["-xf", archive, "-C", tmp], { stdio: "inherit" });
+  const exe = await findFile(tmp, member);
+  if (!exe) throw new Error(`'${member}' not found in ${url}`);
+  await copyFile(exe, exeDest);
+  console.log(`✓ ${exeDest}`);
+  const dllDir = dirname(exeDest);
+  const dlls = (await readdir(dirname(exe))).filter((n) => n.toLowerCase().endsWith(".dll"));
+  for (const dll of dlls) await copyFile(join(dirname(exe), dll), join(dllDir, dll));
+  await rm(tmp, { recursive: true, force: true });
+  console.log(`✓ qpdf DLLs (${dlls.length}) -> ${dllDir}`);
+}
+
 /** Download an archive, extract it, and copy the named member to `dest`. */
 async function fetchFromArchive({ url, member }, dest) {
   const tmp = join(srcTauri, ".fetch-tmp");
@@ -121,6 +147,16 @@ console.log(`✓ ${ytdlpDest}`);
 const ffmpegDest = join(binDir, `ffmpeg-${t.triple}${t.exe}`);
 await fetchFromArchive(t.ffmpeg, ffmpegDest);
 if (!t.exe) await chmod(ffmpegDest, 0o755);
+
+// qpdf (from zip) -> sidecar + sibling DLLs. Windows auto-fetches; other OSes
+// install via a package manager (apt/brew) until a static build is added here.
+if (t.qpdf) {
+  await fetchQpdf(t.qpdf, join(binDir, `qpdf-${t.triple}${t.exe}`));
+} else {
+  console.log(
+    `• qpdf: no auto-fetch for this platform yet — install via your package manager (e.g. \`brew install qpdf\`, \`apt install qpdf\`) and copy it to binaries/qpdf-${t.triple}${t.exe}.`,
+  );
+}
 
 // pdfium (from archive) -> resource dir
 const pdfiumDest = join(pdfiumDir, t.pdfium.member);

@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 
 /** Visible keyboard-focus ring (a11y) — shared by every interactive control. */
 export const focusRing =
@@ -85,6 +85,38 @@ export function Slider({
       className="toolzy-range"
       style={{ width, "--fill": `${pct}%` } as CSSProperties}
     />
+  );
+}
+
+export function PasswordInput({
+  value,
+  onChange,
+  placeholder = "Password",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type={show ? "text" : "password"}
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        onChange={(e) => onChange(e.target.value)}
+        className="w-64 rounded-lg border border-platinum-tint bg-snow-white px-3 py-1.5 text-body-lg text-midnight-indigo focus-visible:border-action-blue focus-visible:outline-none"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className={`text-body font-semibold text-slate-blue hover:text-midnight-indigo ${focusRing}`}
+        aria-label={show ? "Hide password" : "Show password"}
+      >
+        {show ? "Hide" : "Show"}
+      </button>
+    </div>
   );
 }
 

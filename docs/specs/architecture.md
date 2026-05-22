@@ -22,8 +22,8 @@ static landing/download page.
    compiled-in  │                   │  spawned / loaded
    ┌────────────▼─────┐   ┌─────────▼───────────────┐
    │ crates:           │   │ native binaries:         │
-   │ image, webp,      │   │ ffmpeg, yt-dlp (sidecars)│
-   │ printpdf          │   │ pdfium (runtime dylib)   │
+   │ image, webp,      │   │ ffmpeg, yt-dlp, qpdf     │
+   │ printpdf          │   │ (sidecars) · pdfium dll  │
    └───────────────────┘   └──────────────────────────┘
 ```
 
@@ -102,7 +102,8 @@ binaries run as separate processes (sidecars) or runtime-loaded dynamic librarie
 | AVIF / JPEG-XL (planned) | `ravif` / `jpegxl-rs` | permissive | heavy native encoders |
 | PDF read/render | `pdfium-render` (pdfium) | BSD-3 | runtime-loaded dynamic library |
 | PDF write | `printpdf` | MIT | pure Rust |
-| ~~PDF (MuPDF)~~ | — | **AGPL** | ❌ excluded |
+| PDF merge / encrypt / decrypt | `qpdf` | Apache-2.0 | sidecar (separate process) |
+| ~~PDF (MuPDF / Ghostscript)~~ | — | **AGPL** | ❌ excluded |
 | Media | `ffmpeg` | LGPL/GPL build | sidecar (separate process) |
 | Download | `yt-dlp` | Unlicense | sidecar |
 
@@ -152,14 +153,41 @@ swallowed (offline → no prompt, never throws to the UI).
 - ⚠️ The signing key must stay secret; losing it breaks the update chain for installed apps.
 - ⚠️ One outbound request to GitHub at startup (a version check — no file contents).
 
+### ADR-009: qpdf sidecar for PDF merge & encryption
+**Status:** Accepted · 2026-05-22
+
+**Context.** The PDF tab grew four tools — merge, compress, add-password, remove-password
+(`docs/specs/pdf-tools.md`). Merge and password handling need PDF *structure* and *crypto*
+that our existing engines (pdfium = render, printpdf = write) don't provide. The one candidate
+Rust crate, `lopdf`, only reads PDFs with *empty* passwords — it can't decrypt an arbitrary
+password nor re-encrypt to AES-256. Ghostscript would do it all but is **AGPL** (excluded by
+ADR-005).
+
+**Decision.** Bundle **`qpdf`** (**Apache-2.0**) as a **sidecar**, used for merge
+(`--empty --pages`), encrypt (`--encrypt … 256`), and decrypt (`--decrypt`). **Compress** does
+*not* use it: it reuses pdfium + printpdf (rasterize each page, re-embed as JPEG/DCTDecode) so a
+"how much" level slider has real, tunable effect — qpdf's lossless optimization can't tier.
+Passwords ride on the process args (qpdf has no stdin password for encryption) and are never
+logged; on the user's own machine this is standard qpdf usage.
+
+**Consequences.**
+- ✅ Robust, well-tested PDF crypto/merge without writing our own; license stays clean (MIT app).
+- ✅ Arg builders are pure → `cargo test`; the sidecar follows the existing ffmpeg/yt-dlp pattern.
+- ⚠️ qpdf ships as `qpdf.exe` **plus a few DLLs** on Windows; they must sit beside the sidecar
+  (handled in `fetch-binaries.mjs` for dev and `tauri.conf.json` `resources` for the bundle —
+  verify on a real `tauri build`). Auto-fetch is Windows-only today (matches the CI release
+  scope); other OSes install qpdf via a package manager.
+- ⚠️ Compress is **lossy** (text becomes pixels) — documented in the spec and the UI; a
+  lossless "keep text" mode is deferred.
+
 ---
 
 ## Cross-cutting concerns
 
 ### Native libs vs sidecars
 Prefer a **compiled-in crate** (`image`, `webp`, `printpdf`) — no external binary to ship.
-Use a **sidecar** when no good crate exists (`ffmpeg`, `yt-dlp`). **pdfium** is special: a
-prebuilt dynamic library loaded at runtime from beside the executable (fall back to a system
+Use a **sidecar** when no good crate exists (`ffmpeg`, `yt-dlp`, `qpdf`). **pdfium** is special:
+a prebuilt dynamic library loaded at runtime from beside the executable (fall back to a system
 install).
 
 ### Threading

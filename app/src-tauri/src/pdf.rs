@@ -5,7 +5,8 @@ use tauri::Manager;
 
 /// Locate and bind the pdfium library, trying (in order): the bundled resource
 /// dir, the executable's own dir (dev / portable), then a system install.
-fn bind_pdfium(app: &tauri::AppHandle) -> Result<Pdfium, String> {
+/// `pub(crate)` so the compress command can reuse the same lookup.
+pub(crate) fn bind_pdfium(app: &tauri::AppHandle) -> Result<Pdfium, String> {
     let mut dirs: Vec<PathBuf> = Vec::new();
     if let Ok(res) = app.path().resource_dir() {
         dirs.push(res.join("pdfium"));

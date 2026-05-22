@@ -28,3 +28,5 @@ webp = "0.3"
 # exe / fetched); printpdf builds PDFs from images (pure Rust).
 pdfium-render = "0.8"
 printpdf = "0.7"
+# Thumbnails (image + PDF page) are returned to the webview as PNG data URLs.
+base64 = "0.22"
