@@ -1,8 +1,9 @@
 name: Release
 
-# On every push to main: run CI, then bump the patch version, tag, build the
-# Windows installer (binaries bundled), and publish a GitHub Release. PRs run CI
-# only. The release job skips the bot's own bump commit (`chore(release):`).
+# On every push to main: run CI (Biome + app/site build + cargo test) and ONLY if
+# it passes, bump the patch version, tag, build the Windows installer (binaries
+# bundled), and publish a GitHub Release. PRs run CI only. The release job skips
+# the bot's own bump commit (`chore(release):`).
 
 on:
   push:
@@ -18,7 +19,7 @@ concurrency:
 
 jobs:
   ci:
-    name: ci (lint · build)
+    name: ci (lint · build · test)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +44,21 @@ jobs:
         run: |
           pnpm -C site install
           pnpm -C site build
+
+      # Rust engine tests. This step gates the release: `release` needs `ci`, so a
+      # red test blocks publishing. tauri-build validates externalBin + pdfium, so
+      # the binaries must be present; `generate_context!` embeds `dist` (built above).
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - name: Fetch bundled binaries (yt-dlp, ffmpeg, pdfium)
+        run: node app/scripts/fetch-binaries.mjs
+
+      - name: Cargo test (Rust engine)
+        run: cargo test --manifest-path app/src-tauri/Cargo.toml
 
   release:
     name: bump · build · publish
