@@ -194,7 +194,8 @@ Edge cases, Testing checklist, Out of scope. Keep spec and code in sync.
 - Sidecars/pdfium are auto-fetched by `app/scripts/fetch-binaries.mjs` (yt-dlp/ffmpeg/pdfium on
   all platforms; qpdf on Windows — other OSes install it via a package manager) and gitignored
   under `src-tauri/binaries` + `src-tauri/pdfium`.
-- Icons live in `src-tauri/icons` (`pnpm tauri icon <png>`). The current set is a placeholder.
+- Icons in `src-tauri/icons` are generated from `app/app-icon.png` (the canonical 512×512 brand
+  logo) via `pnpm tauri icon` run from `app/`. Edit the source, regenerate — never hand-edit the set.
 
 ---
 
