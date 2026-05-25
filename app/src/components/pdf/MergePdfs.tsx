@@ -1,8 +1,9 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useCallback, useState } from "react";
 import { extOf, stripExt } from "../../lib/path";
-import { mergePdfs } from "../../lib/pdf";
+import { PDF_EXTENSIONS, mergePdfs } from "../../lib/pdf";
 import { useFileDrop } from "../../lib/useFileDrop";
+import { useMultiFile } from "../../lib/useMultiFile";
 import { usePdfItems } from "../../lib/usePdfItems";
 import { PrimaryButton, dropzoneClass } from "../ui";
 import { GridToolbar } from "./GridToolbar";
@@ -19,16 +20,7 @@ export function MergePdfs() {
     [addPaths],
   );
   const over = useFileDrop(addPdfs);
-
-  async function choose() {
-    const picked = await open({
-      multiple: true,
-      directory: false,
-      filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
-    if (Array.isArray(picked)) addPdfs(picked);
-    else if (typeof picked === "string") addPdfs([picked]);
-  }
+  const choose = useMultiFile(PDF_EXTENSIONS, addPdfs, "PDF");
 
   async function run() {
     const first = items[0];

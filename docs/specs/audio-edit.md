@@ -111,7 +111,8 @@ Idle (drop zone) → Picked (file + controls) → Working(busy) → Done(saved p
   speed slider) + a primary action button.
 - **Done / Error**: one line — `Saved: <path>` or `Failed: <stderr tail>`.
 
-Lives under the **Audio** tab's mode pills: **Convert · Trim · Volume · Speed**.
+Lives under the **Audio** tab's mode pills: **Convert · Trim · Volume · Speed · Transcribe**
+(Transcribe — see [transcription](transcription.md)).
 
 ---
 

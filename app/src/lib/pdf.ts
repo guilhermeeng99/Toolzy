@@ -1,17 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { CompressLevel, CompressResult } from "./compress";
+
+export type { CompressLevel, CompressResult };
 
 export type PdfImageFormat = "png" | "jpg";
-export type CompressLevel = "light" | "balanced" | "strong";
 
 /** Single source extension for the PDF tools (stable ref for `useSingleFile`). */
 export const PDF_EXTENSIONS = ["pdf"] as const;
-
-/** Output path + source/result byte sizes from a compress run. */
-export interface CompressResult {
-  path: string;
-  before: number;
-  after: number;
-}
 
 /** Render each PDF page to an image natively (pdfium); returns saved paths. */
 export function pdfToImages(

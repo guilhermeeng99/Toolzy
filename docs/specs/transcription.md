@@ -38,7 +38,8 @@ latency.
   knobs. See rules 11–12.
 - **Models download on demand.** Whisper models are 466 MB–3 GB; bundling bloats the installer.
   The app fetches the chosen model once (from `ggerganov/whisper.cpp` on Hugging Face) plus the
-  small Silero VAD model, to an app-data dir, and reuses them. `fetch-binaries.mjs` fetches only
+  small Silero VAD model (`ggml-silero-v6.2.0.bin`, from `ggml-org/whisper-vad`), to an app-data
+  dir, and reuses them. `fetch-binaries.mjs` fetches only
   the small **engine binary**, never a model.
 - **CPU engine bundled; GPU optional, on demand.** The small CPU `whisper-cli` is bundled (works
   everywhere). On NVIDIA, the user can one-click download a self-contained **CUDA** build (~435 MB)
@@ -100,6 +101,7 @@ async fn transcribe_audio(
     task: Option<String>,      // "transcribe" (default) | "translate" (→ English)
     format: Option<String>,    // "txt" (default) | "srt" | "vtt" | "json"
     on_progress: Channel<TranscribeProgress>, // whisper-cli `--print-progress` % → UI
+    state: State<TranscribeState>,             // holds the running child so Cancel can kill it
 ) -> Result<TranscribeResult, String>;
 
 // Which models exist on disk (drives the UI picker / "needs download" state).
@@ -130,13 +132,15 @@ fn model_filename(id: &str) -> Option<String>;     // id -> "ggml-<id>.bin"
 fn whisper_args(wav: &Path, model: &Path, vad_model: &Path, out_base: &Path,
                 language: Option<&str>, task: &str, format: &str, threads: usize) -> Vec<String>;
 // always emits VAD + greedy/temperature 0 + max-context 0 (anti-hallucination; rules 11–12)
+// + --print-progress (UI %) + -t <threads>; JSON uses -oj (not -ojson)
 fn output_path(src: &Path, format: &str) -> PathBuf; // base.<format-ext>, beside input
 ```
 
 - **Preprocess**: `ffmpeg -y -i <in> -ar 16000 -ac 1 -c:a pcm_s16le <temp.wav>` via the shared
   `run_ffmpeg` (ffmpeg.rs). The temp WAV is deleted after the run (success or failure).
-- **Recognize**: `whisper-cli -m <model.bin> -f <temp.wav> -l <auto|code> [-tr] -o<fmt>
-  -of <out_base>` **plus the fixed anti-hallucination flags**: VAD on with the Silero model
+- **Recognize**: `whisper-cli -m <model.bin> -f <temp.wav> -l <auto|code> -t <threads>
+  [--translate] -o<fmt> -of <out_base>` (JSON is `-oj`, plus `--print-progress` for the UI bar)
+  **plus the fixed anti-hallucination flags**: VAD on with the Silero model
   (`--vad --vad-model <silero.bin>`), greedy/temperature 0, and `max-context 0` (exact flag
   spellings pinned to the bundled whisper-cli version at build). `-of` is the **original** file's
   base path (sans extension), so the transcript lands beside the input, not the temp WAV.
@@ -144,8 +148,10 @@ fn output_path(src: &Path, format: &str) -> PathBuf; // base.<format-ext>, besid
 - **Models** live under `app_data_dir()/models/ggml-<id>.bin`, with the Silero VAD model beside
   them. `transcribe_audio` returns `Err("model not downloaded: <id>")` if the chosen model is
   absent (the UI downloads first); the small VAD model is fetched once on first transcription.
-- **Sidecar**: add `whisper-cli` to `externalBin` + a `shell:allow-execute` capability (Windows
-  ships `whisper-cli.exe` + sibling DLLs — handle like qpdf in `fetch-binaries.mjs`).
+- **Sidecar**: add `whisper-cli` to `externalBin` + **both** a `shell:allow-execute` **and** a
+  `shell:allow-spawn` capability — the CPU path uses `.spawn()` for streamed progress, and spawn
+  needs its own scope entry (Windows ships `whisper-cli.exe` + sibling DLLs — handle like qpdf in
+  `fetch-binaries.mjs`).
 - **GPU engine** (NVIDIA): `download_gpu_engine` fetches the self-contained CUDA build to
   `app_data_dir()/engine-cuda/`; when present, `transcribe_audio` runs that exe via a plain
   `std::process::Command` (it's outside the sidecar allow-list) and skips progress streaming (GPU
@@ -173,8 +179,8 @@ Numbered, testable.
    return `None` for an unknown id → `Err("unknown model: <id>")`.
 4. **Language** — `None` ⇒ `-l auto` (Whisper detects). `Some(code)` forces it (e.g. `pt`). The
    detected/forced code is returned in `TranscribeResult.language`.
-5. **Task** — `transcribe` (default) keeps the source language. `translate` adds `-tr` (Whisper
-   outputs **English** only). Any other value → `Err("unknown task: <task>")`.
+5. **Task** — `transcribe` (default) keeps the source language. `translate` adds `--translate`
+   (Whisper outputs **English** only). Any other value → `Err("unknown task: <task>")`.
 6. **Format** — one of `txt|srt|vtt|json`; anything else → `Err("unknown format: <format>")`.
 7. **Result text** — after a successful run the produced file is read back into
    `TranscribeResult.text` for the UI preview (empty file ⇒ empty string, still `Ok`).
@@ -291,7 +297,7 @@ the component — it calls `lib/transcribe.ts`.
 - **Rust** (`cargo test`):
   - [ ] `model_url` / `model_filename` — known ids map to the HF URL + `ggml-<id>.bin`; unknown → `None`.
   - [ ] `output_path` — keeps the input dir, swaps to the format extension, per format.
-  - [ ] `whisper_args` — builds `-m/-f/-l/-of/-o<fmt>`; **always emits VAD + greedy + max-context 0** (rules 11–12); `translate` adds `-tr`; `auto` vs forced language.
+  - [ ] `whisper_args` — builds `-m/-f/-l/-t/-of/-o<fmt>`; **always emits VAD + greedy + max-context 0 + --print-progress** (rules 11–12); `translate` adds `--translate`; JSON → `-oj`; `auto` vs forced language.
   - [ ] each `Err(String)` path: unknown model/task/format, model-not-downloaded.
   - [ ] `parse_whisper_progress` — `progress = N%` → `N`; a non-progress line → `None`.
 - **Manual / runtime** (needs the sidecars + a downloaded model):

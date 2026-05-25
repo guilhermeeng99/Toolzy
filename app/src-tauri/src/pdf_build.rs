@@ -219,4 +219,23 @@ mod tests {
     fn nth_path_multi_appends_index() {
         assert!(nth_path("C:/x/out.pdf", 1, 3).ends_with("out-2.pdf"));
     }
+
+    #[test]
+    fn place_fit_mode_uses_72_dpi_no_translate() {
+        // "fit" page (fixed = false): fill at 72 dpi, no centering offset.
+        let t = place(800, 600, 100.0, 100.0, 0.0, false);
+        assert_eq!(t.dpi, Some(72.0));
+        assert!(t.translate_x.is_none());
+        assert!(t.translate_y.is_none());
+    }
+
+    #[test]
+    fn place_fixed_page_centers_and_sets_dpi() {
+        // 200x100 px into a 100x100 mm page, no margin: contains to 100x50 mm,
+        // centred vertically (y = 25), flush left (x = 0); dpi = 200 * 25.4 / 100.
+        let t = place(200, 100, 100.0, 100.0, 0.0, true);
+        assert_eq!(t.translate_x.unwrap().0, 0.0);
+        assert_eq!(t.translate_y.unwrap().0, 25.0);
+        assert_eq!(t.dpi, Some(200.0 * 25.4 / 100.0));
+    }
 }

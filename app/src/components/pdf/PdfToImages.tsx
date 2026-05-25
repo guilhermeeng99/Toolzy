@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { baseName } from "../../lib/path";
 import { PDF_EXTENSIONS, type PdfImageFormat, pdfToImages } from "../../lib/pdf";
 import { useSingleFile } from "../../lib/useSingleFile";
-import { Card, Field, PrimaryButton, Slider, dropzoneClass, pill } from "../ui";
+import { Card, Field, FileDropzone, PrimaryButton, Slider, pill } from "../ui";
 
 /** Render each page of a chosen PDF to PNG/JPG next to the source file. */
 export function PdfToImages() {
@@ -55,19 +55,13 @@ export function PdfToImages() {
         </Field>
       </Card>
 
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop a PDF"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          {path ? baseName(path) : "Drop a PDF here, or click to choose"}
-        </span>
-        <span className="text-body text-slate-blue">
-          Pages render natively, saved next to the file
-        </span>
-      </button>
+      <FileDropzone
+        over={over}
+        onChoose={choose}
+        label={path ? baseName(path) : "Drop a PDF here, or click to choose"}
+        hint="Pages render natively, saved next to the file"
+        ariaLabel="Choose or drop a PDF"
+      />
 
       {path ? (
         <PrimaryButton onClick={run} disabled={busy}>

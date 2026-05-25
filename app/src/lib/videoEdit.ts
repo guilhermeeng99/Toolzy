@@ -1,4 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { CompressLevel, CompressResult } from "./compress";
+
+export type { CompressLevel, CompressResult };
 
 /** Source extensions accepted by the video edit modes. */
 export const VIDEO_EXTENSIONS = ["mp4", "mov", "mkv", "avi", "webm"];
@@ -34,15 +37,6 @@ export function mirrorVideo(path: string, direction: "horizontal" | "vertical"):
 /** Change speed by `factor` (0.5–2.0; needs an audio track) → `base-speed.<ext>`. */
 export function changeVideoSpeed(path: string, factor: number): Promise<string> {
   return invoke<string>("change_video_speed", { path, factor });
-}
-
-export type CompressLevel = "light" | "balanced" | "strong";
-
-/** Output path + source/result byte sizes (so the UI shows the saving). */
-export interface CompressResult {
-  path: string;
-  before: number;
-  after: number;
 }
 
 /** Re-encode a video smaller (H.264/AAC mp4) at `level` → `base-compressed.mp4` beside input. */

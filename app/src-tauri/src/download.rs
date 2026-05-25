@@ -252,6 +252,27 @@ fn parse_progress(line: &str) -> Option<DownloadProgress> {
     })
 }
 
+/// Forward every progress line in a stdout/stderr chunk to `on_progress`, and
+/// return the last non-empty, non-progress line — the saved path (on stdout) or an
+/// error line (on stderr). Keeps `download_media`'s event loop flat (one place that
+/// splits a chunk into lines and tells progress apart from text).
+fn drain_progress(bytes: &[u8], on_progress: &Channel<DownloadProgress>) -> Option<String> {
+    let mut text = None;
+    for line in String::from_utf8_lossy(bytes).lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        match parse_progress(trimmed) {
+            Some(progress) => {
+                let _ = on_progress.send(progress);
+            }
+            None => text = Some(trimmed.to_string()),
+        }
+    }
+    text
+}
+
 /// Download a URL as mp4/mp3 with the bundled yt-dlp + ffmpeg sidecars. `height`
 /// caps the MP4 resolution; `audio_bitrate` sets the MP3 kbps. Progress is streamed
 /// to `on_progress` as it downloads (MP4 has two phases — video then audio — so the
@@ -294,30 +315,17 @@ pub async fn download_media(
     while let Some(event) = rx.recv().await {
         match event {
             // yt-dlp writes both the `--progress-template` lines and the
-            // `--print after_move:filepath` path to stdout; a chunk may hold
-            // several lines, so split. Progress lines are sent; the rest is the path.
+            // `--print after_move:filepath` path to stdout; the path is the last
+            // non-progress line.
             CommandEvent::Stdout(bytes) => {
-                for line in String::from_utf8_lossy(&bytes).lines() {
-                    let trimmed = line.trim();
-                    if trimmed.is_empty() {
-                        continue;
-                    }
-                    if let Some(progress) = parse_progress(trimmed) {
-                        let _ = on_progress.send(progress);
-                    } else {
-                        path_line = Some(trimmed.to_string());
-                    }
+                if let Some(text) = drain_progress(&bytes, &on_progress) {
+                    path_line = Some(text);
                 }
             }
             // Real errors land on stderr; keep the last line for the failure message.
             CommandEvent::Stderr(bytes) => {
-                for line in String::from_utf8_lossy(&bytes).lines() {
-                    let trimmed = line.trim();
-                    if let Some(progress) = parse_progress(trimmed) {
-                        let _ = on_progress.send(progress);
-                    } else if !trimmed.is_empty() {
-                        error_tail = trimmed.to_string();
-                    }
+                if let Some(text) = drain_progress(&bytes, &on_progress) {
+                    error_tail = text;
                 }
             }
             CommandEvent::Terminated(payload) if payload.code != Some(0) => {
@@ -426,6 +434,36 @@ mod tests {
                 VideoOption { height: 720, label: "720p".into(), ext: "mp4".into(), filesize: Some(6000) },
             ]
         );
+    }
+
+    #[test]
+    fn best_audio_size_picks_highest_bitrate() {
+        let formats = vec![
+            serde_json::json!({"vcodec": "none", "acodec": "mp4a", "abr": 128.0, "filesize": 1000}),
+            serde_json::json!({"vcodec": "none", "acodec": "opus", "abr": 160.0, "filesize": 1300}),
+            serde_json::json!({"vcodec": "avc1", "acodec": "none", "height": 720, "filesize": 5000}),
+        ];
+        assert_eq!(best_audio_size(&formats), Some(1300));
+    }
+
+    #[test]
+    fn best_audio_size_none_when_no_audio_only_track() {
+        let formats =
+            vec![serde_json::json!({"vcodec": "avc1", "acodec": "none", "height": 720, "filesize": 5000})];
+        assert_eq!(best_audio_size(&formats), None);
+    }
+
+    #[test]
+    fn video_options_skips_audio_only_and_zero_height() {
+        let formats = vec![
+            serde_json::json!({"vcodec": "none", "acodec": "mp4a", "abr": 128.0, "filesize": 1000}),
+            serde_json::json!({"vcodec": "avc1", "acodec": "none", "height": 0, "filesize": 5000}),
+            serde_json::json!({"vcodec": "avc1", "acodec": "none", "height": 480, "filesize": 3000}),
+        ];
+        let v = video_options(&formats);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].height, 480);
+        assert_eq!(v[0].filesize, Some(4000)); // 3000 video + 1000 best audio
     }
 
     #[test]

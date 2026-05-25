@@ -209,6 +209,29 @@ async fn preprocess_to_wav(app: &AppHandle, input: &str, wav: &Path) -> Result<(
     .await
 }
 
+/// Forward whisper-cli progress lines in a chunk to `on_progress`; append the rest
+/// to `log` (kept for language detection) and remember the last non-empty line for
+/// the error message. Keeps `run_whisper`'s event loop flat.
+fn drain_whisper(
+    bytes: &[u8],
+    on_progress: &Channel<TranscribeProgress>,
+    log: &mut String,
+    error_tail: &mut String,
+) {
+    for line in String::from_utf8_lossy(bytes).lines() {
+        if let Some(percent) = parse_whisper_progress(line) {
+            let _ = on_progress.send(TranscribeProgress { percent });
+            continue;
+        }
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            *error_tail = trimmed.to_string();
+        }
+        log.push_str(line);
+        log.push('\n');
+    }
+}
+
 /// Run whisper-cli, streaming `--print-progress` percentages to `on_progress` as they
 /// arrive. Returns the collected stderr log (for language detection) or the stderr
 /// tail as an error. Needs the whisper-cli sidecar.
@@ -225,7 +248,8 @@ async fn run_whisper(
         .args(args)
         .spawn()
         .map_err(|e| e.to_string())?;
-    *child_slot.lock().unwrap() = Some(child); // so cancel_transcription can kill it
+    // so cancel_transcription can kill it
+    *child_slot.lock().map_err(|_| "transcription state lock poisoned".to_string())? = Some(child);
 
     let mut log = String::new();
     let mut error_tail = String::new();
@@ -234,18 +258,7 @@ async fn run_whisper(
             // Progress can surface on either stream; everything else (incl. the
             // detected-language line) is kept for the result / error message.
             CommandEvent::Stdout(bytes) | CommandEvent::Stderr(bytes) => {
-                for line in String::from_utf8_lossy(&bytes).lines() {
-                    if let Some(percent) = parse_whisper_progress(line) {
-                        let _ = on_progress.send(TranscribeProgress { percent });
-                        continue;
-                    }
-                    let trimmed = line.trim();
-                    if !trimmed.is_empty() {
-                        error_tail = trimmed.to_string();
-                    }
-                    log.push_str(line);
-                    log.push('\n');
-                }
+                drain_whisper(&bytes, on_progress, &mut log, &mut error_tail);
             }
             CommandEvent::Terminated(payload) if payload.code != Some(0) => {
                 let reason = if error_tail.is_empty() { "unknown error" } else { &error_tail };
@@ -319,7 +332,7 @@ pub async fn download_whisper_model(
     on_progress: Channel<DownloadProgress>,
 ) -> Result<String, String> {
     let url = model_url(&model).ok_or_else(|| format!("unknown model: {model}"))?;
-    let filename = model_filename(&model).expect("checked by model_url");
+    let filename = model_filename(&model).ok_or_else(|| format!("unknown model: {model}"))?;
     let dir = models_dir(&app)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
@@ -468,6 +481,15 @@ pub async fn download_gpu_engine(
     Ok(())
 }
 
+/// Read the transcript written beside the input and resolve the language label:
+/// the forced language, else whisper's auto-detected code, else "auto".
+fn build_result(out: &Path, forced_language: Option<String>, stderr: &str) -> TranscribeResult {
+    let text = std::fs::read_to_string(out).unwrap_or_default();
+    let language =
+        forced_language.unwrap_or_else(|| detected_language(stderr).unwrap_or_else(|| "auto".into()));
+    TranscribeResult { text, output_path: out.to_string_lossy().into_owned(), language }
+}
+
 /// Transcribe (or translate→English) a media file to text beside the input. Faithful
 /// by design — see the module docs. Needs the ffmpeg + whisper-cli sidecars and the
 /// chosen model already downloaded.
@@ -519,19 +541,23 @@ pub async fn transcribe_audio(
     } else {
         run_whisper(&app, args, &on_progress, &state.child).await
     };
-    *state.child.lock().unwrap() = None; // child finished or was killed; clear the slot
+    // child finished or was killed; clear the slot
+    *state.child.lock().map_err(|_| "transcription state lock poisoned".to_string())? = None;
     let _ = std::fs::remove_file(&wav); // always clean up the temp WAV
 
     let stderr = recognized?;
-    let text = std::fs::read_to_string(&out).unwrap_or_default();
-    let lang = language.unwrap_or_else(|| detected_language(&stderr).unwrap_or_else(|| "auto".into()));
-    Ok(TranscribeResult { text, output_path: out.to_string_lossy().into_owned(), language: lang })
+    Ok(build_result(&out, language, &stderr))
 }
 
 /// Kill the in-flight transcription, if any (the UI Cancel button). No-op when idle.
 #[tauri::command]
 pub fn cancel_transcription(state: State<'_, TranscribeState>) -> Result<(), String> {
-    if let Some(child) = state.child.lock().unwrap().take() {
+    let child = state
+        .child
+        .lock()
+        .map_err(|_| "transcription state lock poisoned".to_string())?
+        .take();
+    if let Some(child) = child {
         child.kill().map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -627,5 +653,18 @@ mod tests {
             Some(40.0)
         );
         assert_eq!(parse_whisper_progress("[00:00:00.000 --> 00:00:02.000] hi"), None);
+    }
+
+    #[test]
+    fn find_file_locates_nested_target() {
+        // Mirrors locating whisper-cli.exe inside the extracted GPU-engine archive.
+        let base = std::env::temp_dir().join(format!("toolzy-findfile-{}", std::process::id()));
+        let nested = base.join("a").join("b");
+        std::fs::create_dir_all(&nested).unwrap();
+        let target = nested.join("whisper-cli.exe");
+        std::fs::write(&target, b"x").unwrap();
+        assert_eq!(find_file(&base, "whisper-cli.exe"), Some(target));
+        assert!(find_file(&base, "not-there.exe").is_none());
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

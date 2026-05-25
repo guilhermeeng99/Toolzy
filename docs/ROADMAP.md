@@ -26,7 +26,7 @@ desktop-only native — the web build and monorepo were removed (see
 | E | Cutover + full docs refresh | ✅ Done |
 | F | Landing site | ✅ Done |
 | G | Release pipeline + auto-update (CI installer, signed updater, Pages) | ✅ Done |
-| H | Audio + video editing (ffmpeg) | ✅ Done |
+| H | Audio + video editing + compress (ffmpeg) | ✅ Done |
 | I | Transcription (Whisper, local, anti-hallucination + NVIDIA GPU) | ✅ Done (verified on Windows incl. GPU) |
 
 ---
@@ -56,7 +56,8 @@ desktop-only native — the web build and monorepo were removed (see
   renamed **Audio** tab): `trim_audio` / `change_audio_volume` / `change_audio_speed`.
   **Video** (new **Video** tab): `trim_video` (lossless), `merge_videos` (concat-demuxer copy),
   `add_audio_to_video` (replace track), `rotate_video` (transpose), `mirror_video`
-  (hflip/vflip), `change_video_speed` (setpts + atempo). Shared `ffmpeg.rs` (`run_ffmpeg`,
+  (hflip/vflip), `change_video_speed` (setpts + atempo), `compress_video` (H.264/AAC in
+  light/balanced/strong levels, 720p cap on strong). Shared `ffmpeg.rs` (`run_ffmpeg`,
   `with_suffix`, `atempo_chain`, `probe_duration`); filter/arg builders cargo-tested. Specs:
   [audio-edit](specs/audio-edit.md) + [video-edit](specs/video-edit.md).
 - ✅ **F — Landing site**: static `site/` (Vite + Tailwind) presenting the app + a download

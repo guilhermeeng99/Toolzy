@@ -1,4 +1,3 @@
-import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import {
   IMAGE_EXTENSIONS,
@@ -10,23 +9,15 @@ import {
   convertImage,
 } from "../lib/convert";
 import { formatBytes, sizeDelta } from "../lib/format";
-import { type QueueItem, useBatchQueue } from "../lib/useBatchQueue";
+import { useBatchQueue } from "../lib/useBatchQueue";
 import { useFileDrop } from "../lib/useFileDrop";
-import {
-  Badge,
-  Card,
-  Field,
-  NumberInput,
-  PrimaryButton,
-  Slider,
-  dropzoneClass,
-  focusRing,
-  pill,
-} from "./ui";
+import { useMultiFile } from "../lib/useMultiFile";
+import { BatchPanel } from "./BatchPanel";
+import { Card, Field, NumberInput, Slider, pill } from "./ui";
 
 const MODES: ResizeMode[] = ["none", "percent", "px"];
 
-type ImageItem = QueueItem & Partial<{ inBytes: number; outBytes: number }>;
+type ImageResult = { inBytes: number; outBytes: number };
 
 export function ImageTool() {
   const [target, setTarget] = useState<ImageTarget>("webp");
@@ -48,25 +39,16 @@ export function ImageTool() {
     };
   }
 
-  const { items, running, pending, addPaths, run, remove, clear } = useBatchQueue<{
-    inBytes: number;
-    outBytes: number;
-  }>(IMAGE_EXTENSIONS, (item) => {
-    const q = QUALITY_TARGETS.has(target) ? quality : undefined;
-    return convertImage({ path: item.path, target, quality: q, resize: buildResize() });
-  });
+  const { items, running, pending, addPaths, run, remove, clear } = useBatchQueue<ImageResult>(
+    IMAGE_EXTENSIONS,
+    (item) => {
+      const q = QUALITY_TARGETS.has(target) ? quality : undefined;
+      return convertImage({ path: item.path, target, quality: q, resize: buildResize() });
+    },
+  );
 
   const over = useFileDrop(addPaths);
-
-  async function choose() {
-    const picked = await open({
-      multiple: true,
-      directory: false,
-      filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
-    });
-    if (Array.isArray(picked)) addPaths(picked);
-    else if (typeof picked === "string") addPaths([picked]);
-  }
+  const choose = useMultiFile(IMAGE_EXTENSIONS, addPaths, "Images");
 
   const isLossy = QUALITY_TARGETS.has(target);
 
@@ -129,54 +111,21 @@ export function ImageTool() {
         </Field>
       </Card>
 
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop images"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          Drop images here, or click to choose
-        </span>
-        <span className="text-body text-slate-blue">
-          PNG · JPG · WebP · GIF · BMP · TIFF — processed natively on your device
-        </span>
-      </button>
-
-      {items.length > 0 ? (
-        <>
-          <div className="flex flex-wrap items-center gap-3">
-            <PrimaryButton onClick={run} disabled={running || pending === 0}>
-              {running ? "Converting..." : `Convert ${pending > 0 ? pending : ""}`}
-            </PrimaryButton>
-            <button
-              type="button"
-              onClick={clear}
-              disabled={running}
-              className={`text-body-lg font-semibold text-slate-blue transition-colors hover:text-midnight-indigo disabled:opacity-50 ${focusRing}`}
-            >
-              Clear
-            </button>
-          </div>
-
-          <ul className="flex flex-col gap-3">
-            {items.map((item) => (
-              <FileRow key={item.id} item={item} onRemove={remove} />
-            ))}
-          </ul>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function FileRow({ item, onRemove }: { item: ImageItem; onRemove: (id: string) => void }) {
-  return (
-    <li className="flex items-center gap-4 rounded-2xl bg-snow-white p-3 shadow-sm-2">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-body-lg font-semibold text-midnight-indigo">{item.name}</p>
-        <p className="text-body text-slate-blue">
-          {item.status === "done" && item.inBytes != null && item.outBytes != null ? (
+      <BatchPanel<ImageResult>
+        items={items}
+        running={running}
+        pending={pending}
+        over={over}
+        choose={choose}
+        run={run}
+        clear={clear}
+        onRemove={remove}
+        action="Convert"
+        verb="Converting..."
+        dropLabel="Drop images here, or click to choose"
+        dropHint="PNG · JPG · WebP · GIF · BMP · TIFF — processed natively on your device"
+        renderDetail={(item) =>
+          item.status === "done" && item.inBytes != null && item.outBytes != null ? (
             <>
               {formatBytes(item.inBytes)} {"->"} {formatBytes(item.outBytes)}{" "}
               <span className="font-semibold text-action-blue">
@@ -187,21 +136,9 @@ function FileRow({ item, onRemove }: { item: ImageItem; onRemove: (id: string) =
             <span className="text-midnight-indigo">{item.error}</span>
           ) : (
             item.path
-          )}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-3">
-        {item.status === "working" ? <Badge>Working</Badge> : null}
-        {item.status === "done" ? <Badge>Done</Badge> : null}
-        <button
-          type="button"
-          onClick={() => onRemove(item.id)}
-          className={`text-slate-blue transition-colors hover:text-midnight-indigo ${focusRing}`}
-          aria-label={`Remove ${item.name}`}
-        >
-          x
-        </button>
-      </div>
-    </li>
+          )
+        }
+      />
+    </div>
   );
 }

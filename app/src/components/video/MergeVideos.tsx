@@ -1,7 +1,8 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useCallback, useState } from "react";
 import { baseName, extOf, stripExt } from "../../lib/path";
 import { useFileDrop } from "../../lib/useFileDrop";
+import { useMultiFile } from "../../lib/useMultiFile";
 import { VIDEO_EXTENSIONS, mergeVideos } from "../../lib/videoEdit";
 import { PrimaryButton, dropzoneClass, focusRing } from "../ui";
 
@@ -21,16 +22,7 @@ export function MergeVideos() {
     setStatus(null);
   }, []);
   const over = useFileDrop(add);
-
-  async function choose() {
-    const picked = await open({
-      multiple: true,
-      directory: false,
-      filters: [{ name: "Video", extensions: VIDEO_EXTENSIONS }],
-    });
-    if (Array.isArray(picked)) add(picked);
-    else if (typeof picked === "string") add([picked]);
-  }
+  const choose = useMultiFile(VIDEO_EXTENSIONS, add, "Video");
 
   const move = (i: number, delta: number) =>
     setPaths((prev) => {

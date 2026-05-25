@@ -170,3 +170,67 @@ export function NumberInput({
     />
   );
 }
+
+/** Styled `<select>` with a custom chevron — shared by the PDF / transcription pickers. */
+export function Select({
+  value,
+  onChange,
+  children,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none rounded-lg border border-platinum-tint bg-snow-white px-3 py-2 pr-9 text-body-lg text-midnight-indigo focus-visible:border-action-blue focus-visible:outline-none"
+      >
+        {children}
+      </select>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-blue"
+      >
+        ▾
+      </span>
+    </div>
+  );
+}
+
+/** Small spinning ring — the shared "working" indicator for busy banners. */
+export function Spinner() {
+  return (
+    <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-action-blue/30 border-t-action-blue" />
+  );
+}
+
+/** Single-file drop/choose target — the dashed zone shared by the single-file tools.
+ *  `label` is the resolved primary line (e.g. the picked file name or a prompt). */
+export function FileDropzone({
+  over,
+  onChoose,
+  label,
+  hint,
+  ariaLabel,
+}: {
+  over: boolean;
+  onChoose: () => void;
+  label: string;
+  hint: string;
+  ariaLabel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onChoose}
+      className={dropzoneClass(over)}
+      aria-label={ariaLabel ?? label}
+    >
+      <span className="text-body-lg font-semibold text-midnight-indigo">{label}</span>
+      <span className="text-body text-slate-blue">{hint}</span>
+    </button>
+  );
+}

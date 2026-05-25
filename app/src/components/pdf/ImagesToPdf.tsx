@@ -1,11 +1,12 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useCallback, useState } from "react";
 import { IMAGE_EXTENSIONS } from "../../lib/convert";
 import { extOf } from "../../lib/path";
 import { type Margin, type Orientation, type PageSize, imagesToPdf } from "../../lib/pdf";
 import { useFileDrop } from "../../lib/useFileDrop";
+import { useMultiFile } from "../../lib/useMultiFile";
 import { usePdfItems } from "../../lib/usePdfItems";
-import { Card, Field, PrimaryButton, dropzoneClass, focusRing } from "../ui";
+import { Card, Field, PrimaryButton, Select, dropzoneClass, focusRing } from "../ui";
 import { GridToolbar } from "./GridToolbar";
 import { type PageFrame, PreviewGrid } from "./PreviewGrid";
 
@@ -64,16 +65,7 @@ export function ImagesToPdf() {
     [addPaths],
   );
   const over = useFileDrop(addImages);
-
-  async function choose() {
-    const picked = await open({
-      multiple: true,
-      directory: false,
-      filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
-    });
-    if (Array.isArray(picked)) addImages(picked);
-    else if (typeof picked === "string") addImages([picked]);
-  }
+  const choose = useMultiFile(IMAGE_EXTENSIONS, addImages, "Images");
 
   async function create() {
     if (items.length === 0) return;
@@ -139,25 +131,13 @@ export function ImagesToPdf() {
       <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-72">
         <Card>
           <Field label="Page size">
-            <div className="relative">
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(e.target.value as PageSize)}
-                className="w-full appearance-none rounded-lg border border-platinum-tint bg-snow-white px-3 py-2 pr-9 text-body-lg text-midnight-indigo focus-visible:border-action-blue focus-visible:outline-none"
-              >
-                {PAGE_SIZES.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              <span
-                aria-hidden
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-blue"
-              >
-                ▾
-              </span>
-            </div>
+            <Select value={pageSize} onChange={(v) => setPageSize(v as PageSize)}>
+              {PAGE_SIZES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label="Orientation">
             <div className="grid grid-cols-2 gap-2">

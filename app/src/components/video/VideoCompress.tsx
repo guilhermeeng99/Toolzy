@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatBytes, sizeDelta } from "../../lib/format";
 import { baseName } from "../../lib/path";
+import { formatTime } from "../../lib/time";
 import { useSingleFile } from "../../lib/useSingleFile";
 import {
   type CompressLevel,
@@ -8,15 +9,13 @@ import {
   VIDEO_EXTENSIONS,
   compressVideo,
 } from "../../lib/videoEdit";
-import { Card, Field, PrimaryButton, dropzoneClass, pill } from "../ui";
+import { Card, Field, FileDropzone, PrimaryButton, Spinner, pill } from "../ui";
 
 const LEVELS: { id: CompressLevel; label: string; hint: string }[] = [
   { id: "light", label: "Light", hint: "Best quality, modest shrink" },
   { id: "balanced", label: "Balanced", hint: "Good shrink, keeps resolution" },
   { id: "strong", label: "Strong", hint: "Smallest — caps to 720p, ideal for sharing" },
 ];
-
-const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 /** Shrink a single video by re-encoding to H.264/AAC mp4 at a chosen level. */
 export function VideoCompress() {
@@ -79,25 +78,21 @@ export function VideoCompress() {
         </p>
       </Card>
 
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop a video"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          {path ? baseName(path) : "Drop a video here, or click to choose"}
-        </span>
-        <span className="text-body text-slate-blue">Compressed natively on your machine</span>
-      </button>
+      <FileDropzone
+        over={over}
+        onChoose={choose}
+        label={path ? baseName(path) : "Drop a video here, or click to choose"}
+        hint="Compressed natively on your machine"
+        ariaLabel="Choose or drop a video"
+      />
 
       {path && !busy ? <PrimaryButton onClick={run}>Compress video</PrimaryButton> : null}
 
       {busy ? (
         <div className="flex items-center gap-3 rounded-lg bg-action-blue/10 px-4 py-3 text-action-blue">
-          <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-action-blue/30 border-t-action-blue" />
+          <Spinner />
           <span className="text-body-lg font-medium">
-            Compressing… {fmtTime(elapsed)} — re-encoding on your CPU, this can take a while.
+            Compressing… {formatTime(elapsed)} — re-encoding on your CPU, this can take a while.
           </span>
         </div>
       ) : null}

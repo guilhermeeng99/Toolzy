@@ -171,6 +171,24 @@ mod tests {
     }
 
     #[test]
+    fn px_keep_aspect_height_only_derives_width() {
+        // Only height given → width scales by the same factor (the (None, Some) branch).
+        assert_eq!(
+            target_dimensions(1000, 500, &r("px", None, Some(250), None, true)),
+            (500, 250)
+        );
+    }
+
+    #[test]
+    fn px_keep_aspect_no_dimensions_keeps_source() {
+        // Neither dimension given → fall back to the source size (the (None, None) branch).
+        assert_eq!(
+            target_dimensions(800, 600, &r("px", None, None, None, true)),
+            (800, 600)
+        );
+    }
+
+    #[test]
     fn px_keep_aspect_both_dimensions_fit_inside_box() {
         assert_eq!(
             target_dimensions(1000, 500, &r("px", Some(400), Some(400), None, true)),

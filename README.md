@@ -20,14 +20,16 @@ Status: ✅ done · 🚧 in progress · ⬜ planned. See [`docs/ROADMAP.md`](doc
 | PDF → images (per page) · images → PDF | ✅ | `pdfium-render` · `printpdf` |
 | PDF merge · compress (lossy) | ✅ | `qpdf` · `pdfium`+`printpdf` |
 | PDF protect · unlock (AES-256 password) | ✅ | `qpdf` sidecar |
-| Media convert (MP4 → MP3, M4A, WAV) | ✅ | `ffmpeg` sidecar |
+| Audio convert (→ MP3, M4A, WAV) · trim · volume · speed | ✅ | `ffmpeg` sidecar |
+| Transcribe speech → text (local Whisper, optional NVIDIA GPU) | ✅ | `whisper.cpp` sidecar |
+| Video trim · merge · add-audio · rotate · mirror · speed · compress | ✅ | `ffmpeg` sidecar |
 | Media downloader (link → MP4 / MP3) | ✅ | `yt-dlp` + `ffmpeg` sidecars |
 | AVIF / JPEG-XL image output | ⬜ | `ravif` / `jpegxl-rs` |
 
 ## Download
 
-Grab the latest installer from [GitHub Releases](https://github.com/guilhermeeng99/Toolzy/releases)
-(Windows · macOS · Linux), or build it yourself (below).
+Grab the latest **Windows** installer from [GitHub Releases](https://github.com/guilhermeeng99/Toolzy/releases)
+(self-updating). macOS/Linux aren't built in CI yet — build them yourself (below).
 
 ## Privacy
 
@@ -49,7 +51,7 @@ toolzy/
 │   │   ├── components/  #     tools + shared ui.tsx
 │   │   └── lib/         #     typed invoke() wrappers
 │   └── src-tauri/       #   Rust = the engine
-│       └── src/         #     commands: image / pdf / media / download (+ pure helpers, cargo-tested)
+│       └── src/         #     commands: image / pdf / audio+video / transcription / download (+ pure helpers, cargo-tested)
 ├── site/                # static landing + download page (Vite + Tailwind)
 └── docs/                # specs + architecture (ADRs) + roadmap
 ```
@@ -61,9 +63,9 @@ Layering:
   `cargo test`.
 - **`app/src` (React)** is presentation only. Components call a typed `lib/*` wrapper, which
   calls a Rust command — the UI holds no conversion logic.
-- **Native binaries** (`ffmpeg`, `yt-dlp`) ship as Tauri **sidecars**; **pdfium** is a
-  dynamic library loaded at runtime. Compiled-in crates (`image`, `webp`, `printpdf`) need no
-  external binary.
+- **Native binaries** (`ffmpeg`, `yt-dlp`, `qpdf`, `whisper-cli`) ship as Tauri **sidecars**;
+  **pdfium** is a dynamic library loaded at runtime. Compiled-in crates (`image`, `webp`,
+  `printpdf`) need no external binary.
 
 ## Tech stack
 
@@ -73,12 +75,13 @@ Layering:
 | UI | React + TypeScript + Vite |
 | Styling | Tailwind CSS v4 |
 | Image | `image` crate (+ `webp`/libwebp); AVIF/JXL planned |
-| PDF | `pdfium-render` (read) · `printpdf` (write) · `qpdf` (merge/encrypt, sidecar) — **no MuPDF/Ghostscript** (AGPL) |
-| Media | native `ffmpeg` (sidecar) |
+| PDF | `pdfium-render` (read) · `printpdf` (write) · `qpdf` (merge/encrypt/decrypt, sidecar) — **no MuPDF/Ghostscript** (AGPL) |
+| Media | native `ffmpeg` (sidecar) — convert + audio/video editing |
+| Transcription | `whisper.cpp` (`whisper-cli` sidecar) — local, optional NVIDIA CUDA GPU |
 | Download | `yt-dlp` (sidecar) |
 | Package manager | pnpm (each of `app/`, `site/` is standalone) |
 | Lint / format | Biome |
-| CI | GitHub Actions (Biome + app/site builds) |
+| CI | GitHub Actions (Biome + `cargo test` + app/site builds; gated release → signed Windows installer + Pages) |
 
 See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the rationale (ADRs).
 
@@ -90,7 +93,7 @@ See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the rationale
 ```bash
 cd app
 pnpm install
-node scripts/fetch-binaries.mjs   # auto-fetches yt-dlp, ffmpeg, pdfium (+ qpdf on Windows; mac/Linux install qpdf via a package manager)
+node scripts/fetch-binaries.mjs   # auto-fetches yt-dlp, ffmpeg, pdfium (+ qpdf & whisper-cli on Windows; mac/Linux install qpdf via a package manager, build whisper.cpp from source)
 pnpm tauri dev                    # run the desktop app
 ```
 
@@ -127,7 +130,7 @@ pnpm dlx @biomejs/biome@1.9.4 ci .                  # lint + format (pin matches
 App code: **MIT** (see `LICENSE`). Bundled binaries keep their own licenses and run as
 **separate processes** (sidecars) or dynamically-loaded libraries, so they don't change the
 app's license: `ffmpeg` (LGPL/GPL build), `yt-dlp` (Unlicense), `pdfium` (BSD-3), `qpdf`
-(Apache-2.0). Do not bundle AGPL libraries — see [ADR-005](docs/specs/architecture.md#adr-005-library--license-choices).
+(Apache-2.0), `whisper.cpp` (MIT). Do not bundle AGPL libraries — see [ADR-005](docs/specs/architecture.md#adr-005-library--license-choices).
 
 ## Legal note
 

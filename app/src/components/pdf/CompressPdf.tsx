@@ -9,7 +9,7 @@ import {
   compressPdf,
 } from "../../lib/pdf";
 import { useSingleFile } from "../../lib/useSingleFile";
-import { Card, Field, PrimaryButton, dropzoneClass, pill } from "../ui";
+import { Card, Field, FileDropzone, PrimaryButton, pill } from "../ui";
 
 const LEVELS: { id: CompressLevel; label: string }[] = [
   { id: "light", label: "Light" },
@@ -73,17 +73,13 @@ export function CompressPdf() {
         </p>
       </Card>
 
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop a PDF"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          {path ? baseName(path) : "Drop a PDF here, or click to choose"}
-        </span>
-        <span className="text-body text-slate-blue">Compressed natively on your machine</span>
-      </button>
+      <FileDropzone
+        over={over}
+        onChoose={choose}
+        label={path ? baseName(path) : "Drop a PDF here, or click to choose"}
+        hint="Compressed natively on your machine"
+        ariaLabel="Choose or drop a PDF"
+      />
 
       {path ? (
         <PrimaryButton onClick={run} disabled={busy}>

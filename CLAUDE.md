@@ -28,9 +28,9 @@ natively); the **React + TypeScript (Vite)** UI is a thin webview front-end. See
 app/
   src/                # React + TS UI (Vite). Presentation only.
     components/        #   tools (ImageTool, PdfTool, MediaTool, VideoTool, DownloadTool)
-                       #     + pdf/ media/ video/ submodes, EditPanel, TimeRange, shared ui.tsx
+                       #     + pdf/ media/ video/ submodes, TranscribeTool, EditPanel, TimeRange, shared ui.tsx
     lib/               #   invoke() wrappers + shared hooks/helpers (convert, pdf, media,
-                       #     audioEdit, videoEdit, format, path, time, update, useFileDrop,
+                       #     audioEdit, videoEdit, transcribe, format, path, time, update, useFileDrop,
                        #     useBatchQueue, useFileEdit, useSingleFile, useTrim, usePdfItems)
   src-tauri/          # Rust = the engine
     src/
@@ -40,10 +40,11 @@ app/
                        #     pdf_merge/pdf_protect (qpdf) + qpdf.rs runner + thumbnail.rs
       ffmpeg.rs        #   shared sidecar plumbing (run_ffmpeg, with_suffix, atempo_chain)
       media.rs / download.rs  #   ffmpeg convert + yt-dlp download sidecars (cargo-tested)
-      audio_edit.rs / video_edit.rs  #   ffmpeg edits: trim/volume/speed/merge/… (cargo-tested)
+      audio_edit.rs / video_edit.rs  #   ffmpeg edits: trim/volume/speed/merge/rotate/compress/… (cargo-tested)
+      transcription.rs #   local speech-to-text (whisper-cli sidecar + on-demand models/GPU; cargo-tested)
     capabilities/      #   Tauri permissions (dialog, shell sidecar allow-list)
-    tauri.conf.json    #   externalBin (yt-dlp, ffmpeg, qpdf), pdfium resource, bundle, window
-  scripts/fetch-binaries.mjs  # auto-fetch yt-dlp/ffmpeg/pdfium (+ qpdf on Windows)
+    tauri.conf.json    #   externalBin (yt-dlp, ffmpeg, qpdf, whisper-cli), pdfium resource, bundle, window
+  scripts/fetch-binaries.mjs  # auto-fetch yt-dlp/ffmpeg/pdfium (+ qpdf & whisper-cli on Windows)
 site/                 # static landing/download page (Vite + Tailwind)
 docs/specs/           # per-feature contracts + architecture.md (ADRs)
 docs/ROADMAP.md       # done / doing / planned
@@ -54,10 +55,11 @@ Layer rules:
 - **Rust (`src-tauri`)** owns conversion + the native libs/sidecars. Keep pure, testable
   logic (resize math, filename/arg building) in its own module with `#[cfg(test)]` tests.
 - **React (`src`)** never converts. A component calls a `lib/*` wrapper → a Rust command.
-- Native binaries (`ffmpeg`, `yt-dlp`, `qpdf`) are **sidecars** (`externalBin` + a
-  `shell:allow-execute` capability scoped to them; `yt-dlp` also has `shell:allow-spawn` for
-  streamed download progress). `pdfium` is a runtime-loaded dynamic library. Compiled-in crates
-  (`image`, `webp`, `printpdf`) need no external binary.
+- Native binaries (`ffmpeg`, `yt-dlp`, `qpdf`, `whisper-cli`) are **sidecars** (`externalBin` + a
+  `shell:allow-execute` capability scoped to them; `yt-dlp` and `whisper-cli` also have
+  `shell:allow-spawn` for streamed progress — spawn needs its own scope entry). `pdfium` is a
+  runtime-loaded dynamic library. Compiled-in crates (`image`, `webp`, `printpdf`) need no
+  external binary.
 
 ---
 
@@ -134,7 +136,8 @@ Rules:
 | Styling | Tailwind CSS v4 (`@tailwindcss/vite`) |
 | Image | `image` crate (png/jpg/gif/bmp/tiff) + `webp` (libwebp); AVIF/JXL planned |
 | PDF | `pdfium-render` (read) + `printpdf` (write) + `qpdf` sidecar (merge/encrypt/decrypt). **No MuPDF/Ghostscript** (AGPL) |
-| Media | native `ffmpeg` via Tauri sidecar |
+| Media | native `ffmpeg` via Tauri sidecar — convert + audio/video editing |
+| Transcription | `whisper.cpp` (`whisper-cli` sidecar) — local speech-to-text, optional NVIDIA CUDA GPU |
 | Download | `yt-dlp` via Tauri sidecar |
 | Dialogs / drag-drop | `@tauri-apps/plugin-dialog` + webview drag-drop (native paths) |
 | Package manager | pnpm — `app/` and `site/` are standalone single-project roots |

@@ -52,8 +52,8 @@ UI wrapper: `app/src/lib/media.ts` → `convertMedia`.
 
 ## 4. UI (`Audio` tab → Convert mode)
 
-The default mode of the **Audio** tab (siblings: Trim / Volume / Speed — see
-[audio-edit](audio-edit.md)). Choose target (mp3/m4a/wav), pick or drop audio/video files,
+The default mode of the **Audio** tab (siblings: Trim / Volume / Speed / Transcribe — see
+[audio-edit](audio-edit.md) and [transcription](transcription.md)). Choose target (mp3/m4a/wav), pick or drop audio/video files,
 Convert; per-file status + saved path. "Converted natively with ffmpeg, on your device."
 
 ---

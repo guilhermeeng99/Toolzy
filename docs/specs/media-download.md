@@ -27,7 +27,7 @@ so no datacenter-IP blocking and no ToS/legal exposure for the project.
      (video + best audio) size from yt-dlp's `filesize`/`filesize_approx`.
    - **Audio (MP3)** — fixed bitrate tiers (320/256/192/128/96/64 kbps). YouTube serves no
      mp3, so these are ffmpeg transcode targets; the size is **estimated** from the duration
-     (`duration × kbps / 8`), shown as a guide.
+     (bytes ≈ `duration_s × kbps × 1000 / 8`), shown as a guide.
 2. **Download** on a row runs `download_media` with the picked quality. yt-dlp uses the right
    flags, merging/extracting via ffmpeg:
    - `mp4` @ height H: `-f "bv*[height<=H]+ba/b[height<=H]" --merge-output-format mp4`
