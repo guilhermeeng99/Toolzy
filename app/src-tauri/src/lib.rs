@@ -41,6 +41,7 @@ pub fn run() {
             video_edit::rotate_video,
             video_edit::mirror_video,
             video_edit::change_video_speed,
+            video_edit::compress_video,
             download::probe_media,
             download::download_media,
             transcription::transcribe_audio,

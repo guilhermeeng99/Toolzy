@@ -35,3 +35,17 @@ export function mirrorVideo(path: string, direction: "horizontal" | "vertical"):
 export function changeVideoSpeed(path: string, factor: number): Promise<string> {
   return invoke<string>("change_video_speed", { path, factor });
 }
+
+export type CompressLevel = "light" | "balanced" | "strong";
+
+/** Output path + source/result byte sizes (so the UI shows the saving). */
+export interface CompressResult {
+  path: string;
+  before: number;
+  after: number;
+}
+
+/** Re-encode a video smaller (H.264/AAC mp4) at `level` → `base-compressed.mp4` beside input. */
+export function compressVideo(path: string, level: CompressLevel): Promise<CompressResult> {
+  return invoke<CompressResult>("compress_video", { path, level });
+}

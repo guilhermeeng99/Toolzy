@@ -3,9 +3,10 @@
 //! ffmpeg args (pure builders below, unit-tested), runs the sidecar, and returns
 //! the saved path. The dedicated Video tab; see `docs/specs/video-edit.md`.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::ffmpeg::{atempo_chain, run_ffmpeg, with_suffix};
+use crate::pdf_compress::CompressResult;
 
 /// Lossless trim: fast seek (`-ss` before `-i`) + copy `dur` seconds (`-c copy`).
 /// The cut snaps to the nearest keyframe at or before `start`.
@@ -232,6 +233,67 @@ pub async fn change_video_speed(
     Ok(out)
 }
 
+/// CRF (quality; higher = smaller), an optional downscale filter, and audio bitrate
+/// per level. Higher level = smaller file. Unknown → balanced. Pure → unit-tested.
+fn compress_params(level: &str) -> (u8, Option<&'static str>, &'static str) {
+    match level {
+        "light" => (23, None, "128k"),
+        // strong also caps the width to 1280 (height auto + even) for a real shrink on
+        // high-res clips; portrait clips (iw < 1280) keep their size, just lower bitrate.
+        "strong" => (30, Some("scale=w='min(1280,iw)':h=-2"), "96k"),
+        _ => (28, None, "128k"), // balanced (default)
+    }
+}
+
+/// Build the H.264 (libx264) / AAC compress args for `level` → an `.mp4`. Pure → tested.
+fn compress_args(path: &str, level: &str, out: &str) -> Vec<String> {
+    let (crf, scale, abr) = compress_params(level);
+    let mut a = vec!["-y".into(), "-i".into(), path.into()];
+    if let Some(filter) = scale {
+        a.push("-vf".into());
+        a.push(filter.into());
+    }
+    a.extend([
+        "-c:v".into(),
+        "libx264".into(),
+        "-crf".into(),
+        crf.to_string(),
+        "-preset".into(),
+        "medium".into(),
+        "-c:a".into(),
+        "aac".into(),
+        "-b:a".into(),
+        abr.into(),
+        "-movflags".into(),
+        "+faststart".into(), // moov atom up front → uploads/preview start sooner
+        out.into(),
+    ]);
+    a
+}
+
+/// Output path beside the input, always `.mp4`: `clip.mkv` → `clip-compressed.mp4`.
+/// Pure → unit-tested.
+fn compressed_out(src: &Path) -> PathBuf {
+    let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("video");
+    src.with_file_name(format!("{stem}-compressed.mp4"))
+}
+
+/// Re-encode a video smaller (H.264/AAC `.mp4`) at `level` (`light`→`strong`). Writes
+/// `<base>-compressed.mp4` beside the input (no save dialog, like the other video edits);
+/// returns before/after byte sizes. Needs the ffmpeg sidecar.
+#[tauri::command]
+pub async fn compress_video(
+    app: tauri::AppHandle,
+    path: String,
+    level: String,
+) -> Result<CompressResult, String> {
+    let out = compressed_out(Path::new(&path)).to_string_lossy().to_string();
+    run_ffmpeg(&app, compress_args(&path, &level, &out)).await?;
+    let before = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let after = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
+    Ok(CompressResult { path: out, before, after })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304,5 +366,41 @@ mod tests {
         assert!(a.contains(&"-filter_complex".to_string()));
         assert!(a.contains(&"[v]".to_string()));
         assert!(a.contains(&"[a]".to_string()));
+    }
+
+    #[test]
+    fn compress_params_decrease_with_level() {
+        assert_eq!(compress_params("light"), (23, None, "128k"));
+        assert_eq!(compress_params("balanced"), (28, None, "128k"));
+        let (crf, scale, abr) = compress_params("strong");
+        assert_eq!((crf, abr), (30, "96k"));
+        assert!(scale.is_some(), "strong downscales");
+    }
+
+    #[test]
+    fn compress_params_unknown_is_balanced() {
+        assert_eq!(compress_params("nonsense"), (28, None, "128k"));
+    }
+
+    #[test]
+    fn compress_args_h264_crf_faststart() {
+        let a = compress_args("in.mkv", "balanced", "out.mp4");
+        assert!(a.contains(&"libx264".to_string()));
+        assert!(a.windows(2).any(|w| w[0] == "-crf" && w[1] == "28"));
+        assert!(a.contains(&"+faststart".to_string()));
+        assert!(!a.contains(&"-vf".to_string())); // balanced keeps resolution
+    }
+
+    #[test]
+    fn compress_args_strong_downscales() {
+        let a = compress_args("in.mp4", "strong", "out.mp4");
+        assert!(a.contains(&"-vf".to_string()));
+        assert!(a.windows(2).any(|w| w[0] == "-crf" && w[1] == "30"));
+    }
+
+    #[test]
+    fn compressed_out_is_mp4_beside_input() {
+        assert_eq!(compressed_out(Path::new("/a/clip.mkv")), PathBuf::from("/a/clip-compressed.mp4"));
+        assert_eq!(compressed_out(Path::new("/a/v.mp4")), PathBuf::from("/a/v-compressed.mp4"));
     }
 }

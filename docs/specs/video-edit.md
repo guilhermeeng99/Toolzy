@@ -1,13 +1,13 @@
 # Video Edit Feature Spec
 
 > **Status**: Implemented (shipped)
-> **Last updated**: 2026-05-22
+> **Last updated**: 2026-05-25
 > **Environment**: desktop (native)
 
 Edit the user's own video files with the bundled **native ffmpeg** sidecar, in a dedicated
 **Video** tab: **trim** to a range, **merge** clips, **add audio** (replace the track),
-**rotate** the orientation, **mirror** (flip), and change the **speed**. Everything runs on the
-user's machine — no uploads.
+**rotate** the orientation, **mirror** (flip), change the **speed**, and **compress** (shrink for
+sharing). Everything runs on the user's machine — no uploads.
 
 **Scope decisions** (locked at design time):
 
@@ -21,6 +21,10 @@ user's machine — no uploads.
   AAC. Mixing with the original track is out of scope (V1).
 - **Write beside the input** with a suffix (same container/extension); **merge** uses a save
   dialog (combining many inputs → an explicit destination).
+- **Compress = re-encode** to **H.264/AAC `.mp4`** at a level (light/balanced/strong; strong also
+  caps to 720p). It is a transcode, so it always outputs `.mp4`, written **beside the input** as
+  `<base>-compressed.mp4` (no save dialog — clicking Compress starts immediately, like the other
+  edits) and returns before/after sizes (reuses `CompressResult`).
 
 ---
 
@@ -28,7 +32,8 @@ user's machine — no uploads.
 
 In (video): `mp4`, `mov`, `mkv`, `avi`, `webm`. Add-audio also takes an audio file
 (`mp3`, `wav`, `m4a`, `flac`, `aac`, `ogg`).
-Out: **same extension as the (first) video input**.
+Out: **same extension as the (first) video input** — except **compress**, which always writes
+`.mp4` (H.264/AAC).
 
 Engine: the bundled **ffmpeg** sidecar for every edit; `probe_duration` (ffmpeg) feeds the trim
 UI's total length.
@@ -51,6 +56,9 @@ async fn rotate_video(app, path: String, degrees: u32) -> Result<String, String>
 async fn mirror_video(app, path: String, direction: String) -> Result<String, String>;
 #[tauri::command]
 async fn change_video_speed(app, path: String, factor: f64) -> Result<String, String>;
+#[tauri::command]
+async fn compress_video(app, path: String, level: String)
+    -> Result<CompressResult, String>; // writes <base>-compressed.mp4; reuses pdf_compress::CompressResult
 
 // pure, unit-tested arg/filter builders
 fn video_trim_args / merge_args / add_audio_args / filter_args (shared by rotate+mirror) / video_speed_args;
@@ -58,6 +66,9 @@ fn concat_list(paths: &[String]) -> String;  // ffmpeg concat-demuxer list-file 
 fn rotate_filter(degrees: u32) -> Option<String>;
 fn mirror_filter(direction: &str) -> Option<&str>;
 fn video_speed_filter(factor: f64) -> String; // setpts + atempo_chain
+fn compress_params(level: &str) -> (u8, Option<&str>, &str); // crf, downscale filter, audio kbps
+fn compress_args(path: &str, level: &str, out: &str) -> Vec<String>; // libx264/CRF/AAC mp4
+fn compressed_out(src: &Path) -> PathBuf; // <base>-compressed.mp4 beside the input
 ```
 
 ffmpeg invocations (all via `run_ffmpeg`, non-zero exit → stderr-tail `Err`):
@@ -71,6 +82,10 @@ ffmpeg invocations (all via `run_ffmpeg`, non-zero exit → stderr-tail `Err`):
 - **Rotate**: `ffmpeg -y -i <in> -vf <rotate_filter(degrees)> -c:a copy <out>`.
 - **Mirror**: `ffmpeg -y -i <in> -vf <hflip|vflip> -c:a copy <out>`.
 - **Speed**: `ffmpeg -y -i <in> -filter_complex <video_speed_filter> -map [v] -map [a] <out>`.
+- **Compress**: `ffmpeg -y -i <in> [-vf scale=w='min(1280,iw)':h=-2] -c:v libx264 -crf <crf>
+  -preset medium -c:a aac -b:a <kbps> -movflags +faststart <out.mp4>` (the `-vf` cap only on
+  `strong`). Levels: light `crf 23` · balanced `crf 28` · strong `crf 30` + 720p cap; lower audio
+  bitrate at strong (`96k` vs `128k`).
 
 UI wrappers: `app/src/lib/videoEdit.ts` (one per command + `VIDEO_EXTENSIONS`).
 
@@ -95,7 +110,10 @@ UI wrappers: `app/src/lib/videoEdit.ts` (one per command + `VIDEO_EXTENSIONS`).
 7. **Speed** factor `0.5..=2.0` (V1) else `Err("speed out of range")`. Filter sets video
    `setpts=(1/factor)*PTS` and audio `atempo_chain(factor)`; the source **must have an audio
    track** (documented edge case).
-8. **Failure** surfaces the ffmpeg stderr tail.
+8. **Compress** re-encodes to H.264/AAC `.mp4` at `level` (`light`/`balanced`/`strong`; unknown →
+   balanced); higher level = smaller. `strong` caps width to 1280 (height auto + even). Writes
+   `<base>-compressed.mp4` beside the input (`compressed_out`); returns `CompressResult`.
+9. **Failure** surfaces the ffmpeg stderr tail.
 
 ---
 
@@ -109,6 +127,7 @@ UI wrappers: `app/src/lib/videoEdit.ts` (one per command + `VIDEO_EXTENSIONS`).
 | Rotate | degrees | `90` / `180` / `270` | `90` | clockwise rotation |
 | Mirror | direction | `horizontal` / `vertical` | `horizontal` | flip axis |
 | Speed | factor (f64) | `0.5`–`2.0` | `1.0` | playback speed (audio retimed) |
+| Compress | level | `light` / `balanced` / `strong` | `balanced` | re-encode smaller (.mp4); strong caps to 720p |
 
 UI disables invalid states; the engine re-checks every rule defensively.
 
@@ -117,7 +136,9 @@ UI disables invalid states; the engine re-checks every rule defensively.
 ## 5. Threading / Performance
 
 `async` commands, one ffmpeg pass each. Trim/merge are stream-copy (fast); rotate/mirror/speed
-and add-audio re-encode at least one stream. No progress streaming in V1 (busy state).
+and add-audio re-encode at least one stream; **compress** re-encodes the whole clip (heaviest, can
+take minutes). No progress streaming yet — busy state; compress shows a spinner + elapsed timer so
+a long run never looks frozen.
 
 ---
 
@@ -127,10 +148,12 @@ and add-audio re-encode at least one stream. No progress streaming in V1 (busy s
 Idle (drop zone) → Picked (file(s) + controls) → Working(busy) → Done(saved path) | Error(stderr tail)
 ```
 
-New **Video** tab with mode pills: **Trim · Merge · Add audio · Rotate · Mirror · Speed**.
-Single-file modes mirror the audio edits (drop/pick → control → run → `Saved:`/`Failed:`).
-Merge shows an ordered, removable list and a save dialog. Add audio shows two pickers
-(video, then audio).
+New **Video** tab with mode pills: **Trim · Merge · Add audio · Rotate · Mirror · Speed ·
+Compress**. Single-file modes mirror the audio edits (drop/pick → control → run →
+`Saved:`/`Failed:`). Merge shows an ordered, removable list and a save dialog. Add audio shows two
+pickers (video, then audio). **Compress** shows level pills, a spinner + elapsed timer while
+encoding, and the before→after size with the % delta (saved as `<base>-compressed.mp4` beside the
+input — no save dialog).
 
 ---
 
@@ -154,6 +177,8 @@ Merge shows an ordered, removable list and a save dialog. Add audio shows two pi
   - [x] `rotate_filter` (90/180/270 + invalid) and `mirror_filter` (h/v + invalid).
   - [x] `video_speed_filter` — `setpts` factor + `atempo` chain.
   - [x] trim / merge / add-audio / rotate / mirror / speed arg builders.
+  - [x] `compress_params` (light/balanced/strong + unknown→balanced) and `compress_args`
+        (libx264/CRF/faststart; strong adds the downscale `-vf`).
   - [x] range + value validation returns the documented `Err` strings.
 - **Manual / runtime** (needs the ffmpeg sidecar):
   - [ ] trim; merge two same-format clips; add audio to a clip; rotate 90/180/270; flip h/v;
@@ -165,5 +190,6 @@ Merge shows an ordered, removable list and a save dialog. Add audio shows two pi
 
 - Re-encode merge for mixed-format clips (concat filter), transitions/crossfade.
 - Mixing added audio with the original track; audio offset/trim while muxing.
-- Resize/scale, crop, watermark, format transcode, GIF export.
+- Arbitrary resize/scale, crop, watermark, GIF export. (Compress does H.264 + an optional 720p
+  cap, and is itself a transcode.)
 - Progress streaming; per-frame preview; video thumbnails in the merge list.

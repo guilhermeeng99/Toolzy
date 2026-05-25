@@ -94,9 +94,10 @@ desktop-only native — the web build and monorepo were removed (see
 - ✅ PDF: compress, merge, reorder, password add/remove _(shipped — Phase C)_. ⬜ Remaining:
   **split** (extract page ranges), page-level reorder, lossless "keep text" compress.
 - ✅ Audio editing: trim, volume, speed _(shipped — Phase H)_.
-- ✅ Video editing: trim, merge, add-audio, rotate, mirror, speed _(shipped — Phase H)_.
-  ⬜ Remaining: transcode (mp4 → webm/gif), resize/scale, crop; re-encode merge for mixed-format
-  clips; mix (not replace) added audio.
+- ✅ Video editing: trim, merge, add-audio, rotate, mirror, speed _(Phase H)_; **compress**
+  (H.264/AAC mp4 in levels, strong caps to 720p — shrink for sharing). ⬜ Remaining: transcode to
+  other formats (webm/gif), crop; re-encode merge for mixed-format clips; mix (not replace) added
+  audio; per-frame/ffmpeg progress for compress.
 - 💡 In-app save-folder picker; reorder/drag in batch lists.
 
 ## Out of scope (deliberate)

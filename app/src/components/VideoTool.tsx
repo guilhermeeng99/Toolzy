@@ -5,9 +5,10 @@ import { MergeVideos } from "./video/MergeVideos";
 import { MirrorVideo } from "./video/MirrorVideo";
 import { RotateVideo } from "./video/RotateVideo";
 import { TrimVideo } from "./video/TrimVideo";
+import { VideoCompress } from "./video/VideoCompress";
 import { VideoSpeed } from "./video/VideoSpeed";
 
-type Mode = "trim" | "merge" | "add-audio" | "rotate" | "mirror" | "speed";
+type Mode = "trim" | "merge" | "add-audio" | "rotate" | "mirror" | "speed" | "compress";
 
 const MODES: { id: Mode; label: string }[] = [
   { id: "trim", label: "Trim" },
@@ -16,6 +17,7 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "rotate", label: "Rotate" },
   { id: "mirror", label: "Mirror" },
   { id: "speed", label: "Speed" },
+  { id: "compress", label: "Compress" },
 ];
 
 function ModeView({ mode }: { mode: Mode }) {
@@ -24,7 +26,8 @@ function ModeView({ mode }: { mode: Mode }) {
   if (mode === "add-audio") return <AddAudio />;
   if (mode === "rotate") return <RotateVideo />;
   if (mode === "mirror") return <MirrorVideo />;
-  return <VideoSpeed />;
+  if (mode === "speed") return <VideoSpeed />;
+  return <VideoCompress />;
 }
 
 export function VideoTool() {
