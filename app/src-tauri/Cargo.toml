@@ -30,3 +30,6 @@ pdfium-render = "0.8"
 printpdf = "0.7"
 # Thumbnails (image + PDF page) are returned to the webview as PNG data URLs.
 base64 = "0.22"
+# On-demand download of Whisper models (transcription). Blocking + tiny dep tree
+# (no async stack), called off the runtime via spawn_blocking.
+ureq = "2"

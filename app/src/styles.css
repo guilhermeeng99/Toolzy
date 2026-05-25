@@ -90,4 +90,18 @@
     border: 2px solid var(--color-snow-white);
     box-shadow: rgba(71, 103, 136, 0.3) 0px 1px 4px;
   }
+
+  /* Indeterminate progress: a chunk that slides across the track. Used while
+     transcribing, where whisper-cli reports no granular % for short clips. */
+  @keyframes toolzy-indeterminate {
+    0% {
+      transform: translateX(-110%);
+    }
+    100% {
+      transform: translateX(310%);
+    }
+  }
+  .toolzy-indeterminate {
+    animation: toolzy-indeterminate 1.1s ease-in-out infinite;
+  }
 }

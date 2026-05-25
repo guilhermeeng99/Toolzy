@@ -29,7 +29,8 @@ const TOOL_META: Record<Tool, { title: string; description: string }> = {
   },
   media: {
     title: "Audio tools",
-    description: "Convert, trim, and adjust volume or speed of your audio — native ffmpeg.",
+    description:
+      "Convert, trim, adjust volume or speed, or transcribe your audio — native ffmpeg + Whisper.",
   },
   video: {
     title: "Video tools",

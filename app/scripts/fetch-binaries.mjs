@@ -35,6 +35,12 @@ const TARGETS = {
       url: "https://github.com/qpdf/qpdf/releases/download/v12.2.0/qpdf-12.2.0-msvc64.zip",
       member: "qpdf.exe",
     },
+    // whisper.cpp CLI (MIT) — local speech-to-text. CPU build; ships whisper-cli.exe
+    // plus sibling ggml/whisper DLLs, handled like qpdf.
+    whisper: {
+      url: "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip",
+      member: "whisper-cli.exe",
+    },
   },
   "linux-x64": {
     triple: "x86_64-unknown-linux-gnu",
@@ -102,10 +108,11 @@ async function findFile(dir, name) {
   return null;
 }
 
-/** qpdf ships as qpdf.exe + sibling DLLs. Copy the exe as the sidecar and every
- *  DLL beside it, so qpdf.exe finds its libs at dev time (`shell().sidecar`). */
-async function fetchQpdf({ url, member }, exeDest) {
-  const tmp = join(srcTauri, ".fetch-tmp-qpdf");
+/** Some Windows sidecars (qpdf, whisper-cli) ship as an .exe + sibling DLLs. Copy
+ *  the exe as the sidecar and every DLL beside it, so the exe finds its libs both at
+ *  dev time (`shell().sidecar`) and in the bundle (resources `binaries/*.dll`). */
+async function fetchExeWithDlls({ url, member }, exeDest, label) {
+  const tmp = join(srcTauri, `.fetch-tmp-${label}`);
   await rm(tmp, { recursive: true, force: true });
   await mkdir(tmp, { recursive: true });
   const archive = join(tmp, "archive");
@@ -119,7 +126,7 @@ async function fetchQpdf({ url, member }, exeDest) {
   const dlls = (await readdir(dirname(exe))).filter((n) => n.toLowerCase().endsWith(".dll"));
   for (const dll of dlls) await copyFile(join(dirname(exe), dll), join(dllDir, dll));
   await rm(tmp, { recursive: true, force: true });
-  console.log(`✓ qpdf DLLs (${dlls.length}) -> ${dllDir}`);
+  console.log(`✓ ${label} DLLs (${dlls.length}) -> ${dllDir}`);
 }
 
 /** Download an archive, extract it, and copy the named member to `dest`. */
@@ -151,10 +158,21 @@ if (!t.exe) await chmod(ffmpegDest, 0o755);
 // qpdf (from zip) -> sidecar + sibling DLLs. Windows auto-fetches; other OSes
 // install via a package manager (apt/brew) until a static build is added here.
 if (t.qpdf) {
-  await fetchQpdf(t.qpdf, join(binDir, `qpdf-${t.triple}${t.exe}`));
+  await fetchExeWithDlls(t.qpdf, join(binDir, `qpdf-${t.triple}${t.exe}`), "qpdf");
 } else {
   console.log(
     `• qpdf: no auto-fetch for this platform yet — install via your package manager (e.g. \`brew install qpdf\`, \`apt install qpdf\`) and copy it to binaries/qpdf-${t.triple}${t.exe}.`,
+  );
+}
+
+// whisper-cli (from zip) -> sidecar + sibling DLLs (ggml/whisper libs). Local
+// transcription. Windows auto-fetches; other OSes build whisper.cpp from source
+// (https://github.com/ggml-org/whisper.cpp) until a static build is added here.
+if (t.whisper) {
+  await fetchExeWithDlls(t.whisper, join(binDir, `whisper-cli-${t.triple}${t.exe}`), "whisper");
+} else {
+  console.log(
+    `• whisper-cli: no auto-fetch for this platform yet — build whisper.cpp and copy whisper-cli to binaries/whisper-cli-${t.triple}${t.exe}.`,
   );
 }
 

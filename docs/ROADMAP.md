@@ -1,6 +1,6 @@
 # Toolzy — Roadmap
 
-> **Last updated**: 2026-05-22
+> **Last updated**: 2026-05-25
 > Single source of truth for what is **done**, **in progress**, and **planned**.
 > Update in the same change that shifts scope (see `CLAUDE.md` → Post-Change Checklist).
 
@@ -27,6 +27,7 @@ desktop-only native — the web build and monorepo were removed (see
 | F | Landing site | ✅ Done |
 | G | Release pipeline + auto-update (CI installer, signed updater, Pages) | ✅ Done |
 | H | Audio + video editing (ffmpeg) | ✅ Done |
+| I | Transcription (Whisper, local, anti-hallucination + NVIDIA GPU) | ✅ Done (verified on Windows incl. GPU) |
 
 ---
 
@@ -65,6 +66,15 @@ desktop-only native — the web build and monorepo were removed (see
   published to GitHub Releases. In-app **auto-update** (`tauri-plugin-updater`, minisign-verified
   `latest.json`) with a current-version badge. Landing site auto-deploys to **GitHub Pages**
   (`deploy-site.yml`).
+- ✅ **I — Transcription**: local speech-to-text via the **whisper.cpp** (`whisper-cli`) sidecar —
+  `transcribe_audio` (ffmpeg → 16 kHz WAV → whisper-cli), `list_whisper_models`,
+  `download_whisper_model` (on-demand models from Hugging Face + Silero VAD; streamed progress).
+  **Faithful by design** — Silero VAD + greedy/`--no-fallback` + `--max-context 0`
+  (anti-hallucination); default `large-v3`. A **Transcribe** mode in the Audio tab with a one-time
+  download gate, **Cancel**, remembered model/language (default pt), and elapsed-timer + `%`
+  progress. **Optional NVIDIA GPU** engine (`download_gpu_engine`, on-demand CUDA — **≈7–10×** on
+  1–2 min clips; CPU fallback). Pure helpers cargo-tested; verified on Windows incl. GPU. Spec:
+  [transcription](specs/transcription.md); rationale [ADR-010](specs/architecture.md).
 
 ---
 
@@ -75,6 +85,8 @@ desktop-only native — the web build and monorepo were removed (see
 - ⬜ Final app icons (the current set is a placeholder; `pnpm tauri icon <png>`).
 - ⬜ Live progress for media convert (stream sidecar output). _(Download progress: ✅ done —
   yt-dlp `--progress-template` streamed to the UI via a Tauri `Channel`.)_
+- ⬜ Transcription on macOS/Linux: auto-fetch the `whisper-cli` + GPU engine (Windows-only today);
+  AMD/Intel GPU via Vulkan. _(NVIDIA CUDA GPU + progress bar: ✅ done.)_
 
 ## Backlog / ideas
 

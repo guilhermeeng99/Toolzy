@@ -10,6 +10,7 @@ mod pdf_merge;
 mod pdf_protect;
 mod qpdf;
 mod thumbnail;
+mod transcription;
 mod video_edit;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,6 +20,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .manage(transcription::TranscribeState::default())
         .invoke_handler(tauri::generate_handler![
             image_convert::convert_image,
             pdf::pdf_to_images,
@@ -40,7 +42,13 @@ pub fn run() {
             video_edit::mirror_video,
             video_edit::change_video_speed,
             download::probe_media,
-            download::download_media
+            download::download_media,
+            transcription::transcribe_audio,
+            transcription::list_whisper_models,
+            transcription::download_whisper_model,
+            transcription::cancel_transcription,
+            transcription::gpu_engine_status,
+            transcription::download_gpu_engine
         ])
         .run(tauri::generate_context!())
         .expect("error while running Toolzy");

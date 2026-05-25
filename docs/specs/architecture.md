@@ -106,6 +106,7 @@ binaries run as separate processes (sidecars) or runtime-loaded dynamic librarie
 | ~~PDF (MuPDF / Ghostscript)~~ | — | **AGPL** | ❌ excluded |
 | Media | `ffmpeg` | LGPL/GPL build | sidecar (separate process) |
 | Download | `yt-dlp` | Unlicense | sidecar |
+| Transcription | `whisper.cpp` (`whisper-cli`) | MIT | sidecar; models (OpenAI Whisper) + Silero VAD also MIT, fetched on demand |
 
 ### ADR-006: Result-based error model (Rust ↔ UI)
 **Status:** Accepted · 2026-05-21
@@ -180,13 +181,47 @@ logged; on the user's own machine this is standard qpdf usage.
 - ⚠️ Compress is **lossy** (text becomes pixels) — documented in the spec and the UI; a
   lossless "keep text" mode is deferred.
 
+### ADR-010: Whisper transcription (sidecar + on-demand models, anti-hallucination)
+**Status:** Accepted · 2026-05-25
+
+**Context.** Users want speech→text **locally**, free, faithful for **pt-BR**, and **without
+hallucination** (Whisper's failure mode: inventing / looping text over silence or noise). Speed is
+explicitly secondary to a correct transcript.
+
+**Decision.** Bundle **whisper.cpp** (`whisper-cli`, **MIT**) as a **sidecar**. Preprocess any
+input to 16 kHz mono WAV with the existing **ffmpeg** sidecar, then recognize. Default model
+**`large-v3`** (max fidelity). Models (OpenAI Whisper, MIT) + the small **Silero VAD** model
+download **on demand** from Hugging Face to the app-data dir (too large to bundle). Recognition
+always runs fixed **anti-hallucination** settings: Silero **VAD** (only detected speech reaches
+Whisper), greedy decoding (`--temperature 0 --no-fallback`), and no previous-text conditioning
+(`--max-context 0`). **CPU build** for v1 (portable). Whisper's `translate` task (→ English only)
+is exposed; translation *into* other languages needs a separate MT engine and is out of scope.
+See the [transcription spec](transcription.md).
+
+**Why not Parakeet / Canary (NVIDIA).** Faster and leading in English, but trained on **European**
+Portuguese (weaker pt-BR per NVIDIA's own model cards), and Parakeet is ASR-only. For faithful
+pt-BR + integration simplicity, Whisper wins.
+
+**Consequences.**
+- ✅ Faithful, private, MIT-clean transcription; reuses the ffmpeg + sidecar/`Channel` patterns.
+- ✅ Registry / URL / arg builders are pure → `cargo test`; flags verified against `whisper-cli`
+  v1.8.4 (incl. JSON = `-oj`, VAD + decoding flags).
+- ⚠️ A **third** outbound request type: the one-time model download from Hugging Face (model
+  weights, never file contents), Rust-side (`ureq`) and user-initiated via the Download button.
+- ✅ Optional **NVIDIA (CUDA) GPU engine**, downloaded on demand (~435 MB) to app-data and run via
+  a plain process — measured **≈7–10×** on 1–2 min clips. CPU stays the bundled default/fallback;
+  AMD/Intel (Vulkan) remains a possible future engine.
+- ⚠️ `whisper-cli` ships as an exe + sibling DLLs on Windows (handled like qpdf in
+  `fetch-binaries.mjs`, bundled via `resources` `binaries/*.dll`); auto-fetch is Windows-only.
+
 ---
 
 ## Cross-cutting concerns
 
 ### Native libs vs sidecars
 Prefer a **compiled-in crate** (`image`, `webp`, `printpdf`) — no external binary to ship.
-Use a **sidecar** when no good crate exists (`ffmpeg`, `yt-dlp`, `qpdf`). **pdfium** is special:
+Use a **sidecar** when no good crate exists (`ffmpeg`, `yt-dlp`, `qpdf`, `whisper-cli`). **pdfium**
+is special:
 a prebuilt dynamic library loaded at runtime from beside the executable (fall back to a system
 install).
 
@@ -203,9 +238,11 @@ The UI gets real paths from native dialogs (`@tauri-apps/plugin-dialog`) and OS 
 No content-inspecting telemetry; no uploads; no Toolzy server in any path. Validate inputs
 (e.g. http(s) URLs) before spawning a sidecar.
 
-Only two outbound requests exist, both direct from the user's machine and unrelated to file
-contents: (1) the updater's startup version check against GitHub Releases (ADR-008), and
+Three kinds of outbound request exist, all direct from the user's machine and unrelated to file
+contents: (1) the updater's startup version check against GitHub Releases (ADR-008);
 (2) the downloader's video **thumbnail** in the probe result, loaded from the source host
-(e.g. `i.ytimg.com`) — the same host the download itself hits. The webview runs under a
+(e.g. `i.ytimg.com`) — the same host the download itself hits; and (3) the **one-time Whisper
+model download** from Hugging Face when the user clicks Download in the Audio tab's Transcribe mode (model
+weights only — Rust-side via `ureq`, user-initiated; ADR-010). The webview runs under a
 restrictive **CSP** (`tauri.conf.json` → `app.security.csp`): `default-src 'self'` with remote
 images allowed (`img-src https: data:`) for that thumbnail and no remote scripts.

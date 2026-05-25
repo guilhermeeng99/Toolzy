@@ -13,7 +13,8 @@
       "allow": [
         { "name": "binaries/yt-dlp", "sidecar": true, "args": true },
         { "name": "binaries/ffmpeg", "sidecar": true, "args": true },
-        { "name": "binaries/qpdf", "sidecar": true, "args": true }
+        { "name": "binaries/qpdf", "sidecar": true, "args": true },
+        { "name": "binaries/whisper-cli", "sidecar": true, "args": true }
       ]
     },
     {

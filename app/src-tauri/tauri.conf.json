@@ -45,7 +45,8 @@
     "externalBin": [
       "binaries/yt-dlp",
       "binaries/ffmpeg",
-      "binaries/qpdf"
+      "binaries/qpdf",
+      "binaries/whisper-cli"
     ],
     "resources": {
       "pdfium/*": "pdfium/",
