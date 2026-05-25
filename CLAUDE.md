@@ -157,6 +157,7 @@ pnpm build            # tsc --noEmit + vite build
 pnpm tauri build      # installer for the current OS (needs icons + sidecar binaries)
 node scripts/fetch-binaries.mjs   # auto-fetch yt-dlp/ffmpeg/pdfium (+ qpdf on Windows)
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings   # release CI gate (warnings = errors)
 
 # repo root
 pnpm dlx @biomejs/biome@1.9.4 ci .   # lint + format (pin matches CI)
@@ -173,10 +174,11 @@ pnpm dlx @biomejs/biome@1.9.4 ci .   # lint + format (pin matches CI)
 After every change:
 
 1. `cargo test` (if Rust touched) — green; new pure logic has tests, bug fixes get a regression test.
-2. `pnpm build` in `app/` (and `site/` if touched) — tsc + Vite green.
-3. `pnpm dlx @biomejs/biome@1.9.4 ci .` — zero errors (pin matches CI).
-4. Touched a feature's behavior? Update its spec in `docs/specs/` in the same change.
-5. Shipped/started/finished a roadmap item? Update `docs/ROADMAP.md`.
+2. `cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings` (if Rust touched) — zero warnings. **The release CI gates on this**; `cargo test` alone won't catch clippy lints (`too_many_arguments`, doc formatting, …), and a red clippy silently blocks the release.
+3. `pnpm build` in `app/` (and `site/` if touched) — tsc + Vite green.
+4. `pnpm dlx @biomejs/biome@1.9.4 ci .` — zero errors (pin matches CI).
+5. Touched a feature's behavior? Update its spec in `docs/specs/` in the same change.
+6. Shipped/started/finished a roadmap item? Update `docs/ROADMAP.md`.
 
 ---
 

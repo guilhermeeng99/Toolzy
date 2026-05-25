@@ -115,9 +115,10 @@ fn output_path(src: &Path, format: &str) -> Option<PathBuf> {
     format_ext(format).map(|ext| src.with_extension(ext))
 }
 
-/// Build the whisper-cli args. Always emits the fixed anti-hallucination flags (VAD
-/// + greedy + no-fallback + no previous-text context); `-of` is the input's base
-/// path so output lands beside the input. Pure → unit-tested.
+/// Build the whisper-cli args. Always emits the fixed anti-hallucination flags (VAD,
+/// greedy, no-fallback, no previous-text context); `-of` is the input's base path so
+/// output lands beside the input. Pure → unit-tested.
+#[allow(clippy::too_many_arguments)]
 fn whisper_args(
     wav: &Path,
     model: &Path,
@@ -493,6 +494,7 @@ fn build_result(out: &Path, forced_language: Option<String>, stderr: &str) -> Tr
 /// Transcribe (or translate→English) a media file to text beside the input. Faithful
 /// by design — see the module docs. Needs the ffmpeg + whisper-cli sidecars and the
 /// chosen model already downloaded.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn transcribe_audio(
     app: AppHandle,
