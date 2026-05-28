@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::ffmpeg::run_ffmpeg;
+use crate::image_convert::output_path;
 
 pub const AUDIO_TARGETS: &[&str] = &["mp3", "m4a", "wav"];
 
@@ -25,10 +26,8 @@ pub async fn convert_media(
         return Err(format!("unsupported target: {target}"));
     }
 
-    let src = Path::new(&path);
-    let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("audio");
-    let out = src.with_file_name(format!("{stem}.{target}"));
-    let out_str = out.to_string_lossy().to_string();
+    // Same stem-swap-extension rule as image convert; reuse its tested helper.
+    let out_str = output_path(Path::new(&path), &target).to_string_lossy().to_string();
 
     let mut args = vec!["-y".to_string(), "-i".to_string(), path.clone(), "-vn".to_string()];
     args.extend(audio_codec(&target));

@@ -7,6 +7,7 @@
 use std::path::Path;
 
 use crate::ffmpeg::{atempo_chain, run_ffmpeg, with_suffix};
+use crate::validate::{valid_speed, valid_trim_range, valid_volume};
 
 /// `-ss`/`-to` are placed **after** `-i` so the cut is accurate (decode-then-trim);
 /// no `-c copy`, so ffmpeg re-encodes with the output extension's default encoder.
@@ -58,9 +59,7 @@ pub async fn trim_audio(
     start: f64,
     end: f64,
 ) -> Result<String, String> {
-    if !(start >= 0.0 && start < end) {
-        return Err("invalid trim range".into());
-    }
+    valid_trim_range(start, end)?;
     let out = with_suffix(Path::new(&path), "trimmed").to_string_lossy().to_string();
     run_ffmpeg(&app, trim_args(&path, start, end, &out)).await?;
     Ok(out)
@@ -74,9 +73,7 @@ pub async fn change_audio_volume(
     path: String,
     percent: u32,
 ) -> Result<String, String> {
-    if percent > 400 {
-        return Err("volume out of range".into());
-    }
+    valid_volume(percent)?;
     let out = with_suffix(Path::new(&path), "volume").to_string_lossy().to_string();
     run_ffmpeg(&app, volume_args(&path, percent, &out)).await?;
     Ok(out)
@@ -90,9 +87,7 @@ pub async fn change_audio_speed(
     path: String,
     factor: f64,
 ) -> Result<String, String> {
-    if !(0.5..=2.0).contains(&factor) {
-        return Err("speed out of range".into());
-    }
+    valid_speed(factor)?;
     let out = with_suffix(Path::new(&path), "speed").to_string_lossy().to_string();
     run_ffmpeg(&app, speed_args(&path, factor, &out)).await?;
     Ok(out)

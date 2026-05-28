@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { formatBytes, sizeDelta } from "../../lib/format";
 import { baseName } from "../../lib/path";
 import { formatTime } from "../../lib/time";
+import { useAsyncAction } from "../../lib/useAsyncAction";
+import { useElapsedSeconds } from "../../lib/useElapsedSeconds";
 import { useSingleFile } from "../../lib/useSingleFile";
 import {
   type CompressLevel,
@@ -20,38 +22,15 @@ const LEVELS: { id: CompressLevel; label: string; hint: string }[] = [
 /** Shrink a single video by re-encoding to H.264/AAC mp4 at a chosen level. */
 export function VideoCompress() {
   const [level, setLevel] = useState<CompressLevel>("balanced");
-  const [busy, setBusy] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [result, setResult] = useState<CompressResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { path, over, choose } = useSingleFile(
-    VIDEO_EXTENSIONS,
-    useCallback(() => {
-      setResult(null);
-      setError(null);
-    }, []),
-  );
-
+  const { busy, result, error, run, reset } = useAsyncAction<CompressResult>();
   // Re-encoding has no streamed progress yet; a spinner + elapsed timer makes a long
   // compress clearly "working", not frozen.
-  useEffect(() => {
-    if (!busy) return;
-    setElapsed(0);
-    const id = window.setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [busy]);
+  const elapsed = useElapsedSeconds(busy);
+  const { path, over, choose } = useSingleFile(VIDEO_EXTENSIONS, reset);
 
-  async function run() {
+  function compress() {
     if (!path) return;
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    try {
-      setResult(await compressVideo(path, level));
-    } catch (e) {
-      setError(String(e));
-    }
-    setBusy(false);
+    run(() => compressVideo(path, level));
   }
 
   const current = LEVELS.find((l) => l.id === level);
@@ -86,7 +65,7 @@ export function VideoCompress() {
         ariaLabel="Choose or drop a video"
       />
 
-      {path && !busy ? <PrimaryButton onClick={run}>Compress video</PrimaryButton> : null}
+      {path && !busy ? <PrimaryButton onClick={compress}>Compress video</PrimaryButton> : null}
 
       {busy ? (
         <div className="flex items-center gap-3 rounded-lg bg-action-blue/10 px-4 py-3 text-action-blue">

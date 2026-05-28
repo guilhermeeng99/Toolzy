@@ -6,7 +6,7 @@ import { type Margin, type Orientation, type PageSize, imagesToPdf } from "../..
 import { useFileDrop } from "../../lib/useFileDrop";
 import { useMultiFile } from "../../lib/useMultiFile";
 import { usePdfItems } from "../../lib/usePdfItems";
-import { Card, Field, PrimaryButton, Select, dropzoneClass, focusRing } from "../ui";
+import { Card, Field, FileDropzone, PrimaryButton, Select, focusRing } from "../ui";
 import { GridToolbar } from "./GridToolbar";
 import { type PageFrame, PreviewGrid } from "./PreviewGrid";
 
@@ -89,19 +89,13 @@ export function ImagesToPdf() {
 
   if (items.length === 0) {
     return (
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop images"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          Drop images here, or click to choose
-        </span>
-        <span className="text-body text-slate-blue">
-          Reorder, rotate, and set the page layout next
-        </span>
-      </button>
+      <FileDropzone
+        over={over}
+        onChoose={choose}
+        label="Drop images here, or click to choose"
+        hint="Reorder, rotate, and set the page layout next"
+        ariaLabel="Choose or drop images"
+      />
     );
   }
 

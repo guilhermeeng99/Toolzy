@@ -11,6 +11,7 @@ mod pdf_protect;
 mod qpdf;
 mod thumbnail;
 mod transcription;
+mod validate;
 mod video_edit;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

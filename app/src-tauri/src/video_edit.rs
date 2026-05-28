@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::ffmpeg::{atempo_chain, run_ffmpeg, with_suffix};
 use crate::pdf_compress::CompressResult;
+use crate::validate::{require_two_videos, valid_speed, valid_trim_range};
 
 /// Lossless trim: fast seek (`-ss` before `-i`) + copy `dur` seconds (`-c copy`).
 /// The cut snaps to the nearest keyframe at or before `start`.
@@ -140,9 +141,7 @@ pub async fn trim_video(
     start: f64,
     end: f64,
 ) -> Result<String, String> {
-    if !(start >= 0.0 && start < end) {
-        return Err("invalid trim range".into());
-    }
+    valid_trim_range(start, end)?;
     let out = with_suffix(Path::new(&path), "trimmed").to_string_lossy().to_string();
     run_ffmpeg(&app, video_trim_args(&path, start, end - start, &out)).await?;
     Ok(out)
@@ -157,9 +156,7 @@ pub async fn merge_videos(
     paths: Vec<String>,
     out: String,
 ) -> Result<String, String> {
-    if paths.len() < 2 {
-        return Err("need at least two videos".into());
-    }
+    require_two_videos(paths.len())?;
     let list_path = std::env::temp_dir().join(format!(
         "toolzy-concat-{}.txt",
         std::time::SystemTime::now()
@@ -225,9 +222,7 @@ pub async fn change_video_speed(
     path: String,
     factor: f64,
 ) -> Result<String, String> {
-    if !(0.5..=2.0).contains(&factor) {
-        return Err("speed out of range".into());
-    }
+    valid_speed(factor)?;
     let out = with_suffix(Path::new(&path), "speed").to_string_lossy().to_string();
     run_ffmpeg(&app, video_speed_args(&path, &video_speed_filter(factor), &out)).await?;
     Ok(out)
@@ -235,7 +230,7 @@ pub async fn change_video_speed(
 
 /// CRF (quality; higher = smaller), an optional downscale filter, and audio bitrate
 /// per level. Higher level = smaller file. Unknown → balanced. Pure → unit-tested.
-fn compress_params(level: &str) -> (u8, Option<&'static str>, &'static str) {
+fn video_compress_params(level: &str) -> (u8, Option<&'static str>, &'static str) {
     match level {
         "light" => (23, None, "128k"),
         // strong also caps the width to 1280 (height auto + even) for a real shrink on
@@ -247,7 +242,7 @@ fn compress_params(level: &str) -> (u8, Option<&'static str>, &'static str) {
 
 /// Build the H.264 (libx264) / AAC compress args for `level` → an `.mp4`. Pure → tested.
 fn compress_args(path: &str, level: &str, out: &str) -> Vec<String> {
-    let (crf, scale, abr) = compress_params(level);
+    let (crf, scale, abr) = video_compress_params(level);
     let mut a = vec!["-y".into(), "-i".into(), path.into()];
     if let Some(filter) = scale {
         a.push("-vf".into());
@@ -369,17 +364,17 @@ mod tests {
     }
 
     #[test]
-    fn compress_params_decrease_with_level() {
-        assert_eq!(compress_params("light"), (23, None, "128k"));
-        assert_eq!(compress_params("balanced"), (28, None, "128k"));
-        let (crf, scale, abr) = compress_params("strong");
+    fn video_compress_params_decrease_with_level() {
+        assert_eq!(video_compress_params("light"), (23, None, "128k"));
+        assert_eq!(video_compress_params("balanced"), (28, None, "128k"));
+        let (crf, scale, abr) = video_compress_params("strong");
         assert_eq!((crf, abr), (30, "96k"));
         assert!(scale.is_some(), "strong downscales");
     }
 
     #[test]
-    fn compress_params_unknown_is_balanced() {
-        assert_eq!(compress_params("nonsense"), (28, None, "128k"));
+    fn video_compress_params_unknown_is_balanced() {
+        assert_eq!(video_compress_params("nonsense"), (28, None, "128k"));
     }
 
     #[test]

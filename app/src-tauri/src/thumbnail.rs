@@ -13,13 +13,7 @@ use crate::pdf::bind_pdfium;
 /// by the grid pickers (images→PDF, merge). PDFs need the pdfium library.
 #[tauri::command]
 pub fn make_thumbnail(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let ext = Path::new(&path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(str::to_ascii_lowercase)
-        .unwrap_or_default();
-
-    let image = if ext == "pdf" {
+    let image = if is_pdf(Path::new(&path)) {
         render_pdf_first_page(&app, &path)?
     } else {
         image::ImageReader::open(&path)
@@ -46,7 +40,8 @@ fn render_pdf_first_page(app: &tauri::AppHandle, path: &str) -> Result<DynamicIm
     let image = page
         .render_with_config(&config)
         .map_err(|e| format!("render failed: {e}"))?
-        .as_image();
+        .as_image()
+        .map_err(|e| format!("render failed: {e}"))?;
     Ok(image)
 }
 
@@ -55,4 +50,25 @@ fn encode_png_data_url(img: &DynamicImage) -> Result<String, String> {
     img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Png)
         .map_err(|e| format!("encode failed: {e}"))?;
     Ok(format!("data:image/png;base64,{}", STANDARD.encode(&buf)))
+}
+
+/// True for a `.pdf` extension (case-insensitive). A missing extension is not a PDF,
+/// so it routes to the image decoder. Pure → unit-tested.
+fn is_pdf(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_pdf_matches_extension_case_insensitively() {
+        assert!(is_pdf(Path::new("a/b.pdf")));
+        assert!(is_pdf(Path::new("a/b.PDF")));
+        assert!(!is_pdf(Path::new("a/b.jpg")));
+        assert!(!is_pdf(Path::new("a/b")));
+    }
 }

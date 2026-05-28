@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { baseName } from "../lib/path";
-import { Card, PrimaryButton, dropzoneClass } from "./ui";
+import { Card, FileDropzone, PrimaryButton } from "./ui";
 
 /**
  * Shared shell for the single-file edit modes (audio + video): a drop zone, then —
@@ -36,17 +36,13 @@ export function EditPanel({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop a file"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          {path ? baseName(path) : dropLabel}
-        </span>
-        <span className="text-body text-slate-blue">Processed natively on your machine</span>
-      </button>
+      <FileDropzone
+        over={over}
+        onChoose={choose}
+        label={path ? baseName(path) : dropLabel}
+        hint="Processed natively on your machine"
+        ariaLabel="Choose or drop a file"
+      />
 
       {path ? (
         <>

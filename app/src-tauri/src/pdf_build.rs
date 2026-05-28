@@ -5,7 +5,7 @@ use image::DynamicImage;
 use printpdf::{ImageTransform, Mm, PdfDocumentReference};
 use serde::Deserialize;
 
-use crate::pdf_compress::{embed_jpeg, encode_jpeg};
+use crate::pdf_compress::{append_jpeg_page, encode_jpeg};
 
 // 1 px at 72 dpi -> mm — used to size a page to its image in "fit" mode.
 const MM_PER_PX: f32 = 25.4 / 72.0;
@@ -74,19 +74,7 @@ fn build_doc(
         let jpeg = encode_jpeg(&img.to_rgb8(), JPEG_QUALITY)?;
         let (page_w, page_h) = dims.unwrap_or((pw as f32 * MM_PER_PX, ph as f32 * MM_PER_PX));
         let transform = place(pw, ph, page_w, page_h, margin, dims.is_some());
-
-        match &out {
-            None => {
-                let (doc, p, l) =
-                    printpdf::PdfDocument::new("Toolzy", Mm(page_w), Mm(page_h), "Layer 1");
-                embed_jpeg(&doc, p, l, pw as usize, ph as usize, jpeg, transform);
-                out = Some(doc);
-            }
-            Some(doc) => {
-                let (p, l) = doc.add_page(Mm(page_w), Mm(page_h), "Layer 1");
-                embed_jpeg(doc, p, l, pw as usize, ph as usize, jpeg, transform);
-            }
-        }
+        append_jpeg_page(&mut out, (page_w, page_h), (pw as usize, ph as usize), jpeg, transform);
     }
     out.ok_or_else(|| "no images provided".into())
 }

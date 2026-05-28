@@ -5,7 +5,7 @@ import { PDF_EXTENSIONS, mergePdfs } from "../../lib/pdf";
 import { useFileDrop } from "../../lib/useFileDrop";
 import { useMultiFile } from "../../lib/useMultiFile";
 import { usePdfItems } from "../../lib/usePdfItems";
-import { PrimaryButton, dropzoneClass } from "../ui";
+import { FileDropzone, PrimaryButton } from "../ui";
 import { GridToolbar } from "./GridToolbar";
 import { PreviewGrid } from "./PreviewGrid";
 
@@ -47,17 +47,13 @@ export function MergePdfs() {
 
   if (items.length === 0) {
     return (
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop PDFs"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          Drop PDFs here, or click to choose
-        </span>
-        <span className="text-body text-slate-blue">Drag to set the merge order</span>
-      </button>
+      <FileDropzone
+        over={over}
+        onChoose={choose}
+        label="Drop PDFs here, or click to choose"
+        hint="Drag to set the merge order"
+        ariaLabel="Choose or drop PDFs"
+      />
     );
   }
 

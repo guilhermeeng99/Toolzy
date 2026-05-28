@@ -1,5 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { formatBytes, sizeDelta } from "../../lib/format";
 import { baseName, stripExt } from "../../lib/path";
 import {
@@ -8,6 +8,7 @@ import {
   PDF_EXTENSIONS,
   compressPdf,
 } from "../../lib/pdf";
+import { useAsyncAction } from "../../lib/useAsyncAction";
 import { useSingleFile } from "../../lib/useSingleFile";
 import { Card, Field, FileDropzone, PrimaryButton, pill } from "../ui";
 
@@ -20,34 +21,18 @@ const LEVELS: { id: CompressLevel; label: string }[] = [
 /** Shrink a single PDF by re-rasterizing its pages at a chosen level. */
 export function CompressPdf() {
   const [level, setLevel] = useState<CompressLevel>("balanced");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<CompressResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, result, error, run, reset } = useAsyncAction<CompressResult>();
   // Clear the previous result when a new file is picked.
-  const { path, over, choose } = useSingleFile(
-    PDF_EXTENSIONS,
-    useCallback(() => {
-      setResult(null);
-      setError(null);
-    }, []),
-  );
+  const { path, over, choose } = useSingleFile(PDF_EXTENSIONS, reset);
 
-  async function run() {
+  async function go() {
     if (!path) return;
     const out = await save({
       defaultPath: `${stripExt(path)}-compressed.pdf`,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
     if (!out) return;
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    try {
-      setResult(await compressPdf(path, out, level));
-    } catch (e) {
-      setError(String(e));
-    }
-    setBusy(false);
+    run(() => compressPdf(path, out, level));
   }
 
   return (
@@ -82,7 +67,7 @@ export function CompressPdf() {
       />
 
       {path ? (
-        <PrimaryButton onClick={run} disabled={busy}>
+        <PrimaryButton onClick={go} disabled={busy}>
           {busy ? "Compressing..." : "Compress PDF"}
         </PrimaryButton>
       ) : null}

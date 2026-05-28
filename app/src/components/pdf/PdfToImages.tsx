@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { baseName } from "../../lib/path";
 import { PDF_EXTENSIONS, type PdfImageFormat, pdfToImages } from "../../lib/pdf";
+import { useAsyncAction } from "../../lib/useAsyncAction";
 import { useSingleFile } from "../../lib/useSingleFile";
 import { Card, Field, FileDropzone, PrimaryButton, Slider, pill } from "../ui";
 
@@ -8,29 +9,14 @@ import { Card, Field, FileDropzone, PrimaryButton, Slider, pill } from "../ui";
 export function PdfToImages() {
   const [format, setFormat] = useState<PdfImageFormat>("png");
   const [scale, setScale] = useState(2);
-  const [busy, setBusy] = useState(false);
-  const [pages, setPages] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, result, error, run, reset } = useAsyncAction<string[]>();
+  const pages = result ?? [];
   // Clear previous render output when a new PDF is picked.
-  const { path, over, choose } = useSingleFile(
-    PDF_EXTENSIONS,
-    useCallback(() => {
-      setPages([]);
-      setError(null);
-    }, []),
-  );
+  const { path, over, choose } = useSingleFile(PDF_EXTENSIONS, reset);
 
-  async function run() {
+  function convert() {
     if (!path) return;
-    setBusy(true);
-    setError(null);
-    setPages([]);
-    try {
-      setPages(await pdfToImages(path, format, scale));
-    } catch (e) {
-      setError(String(e));
-    }
-    setBusy(false);
+    run(() => pdfToImages(path, format, scale));
   }
 
   return (
@@ -64,7 +50,7 @@ export function PdfToImages() {
       />
 
       {path ? (
-        <PrimaryButton onClick={run} disabled={busy}>
+        <PrimaryButton onClick={convert} disabled={busy}>
           {busy ? "Rendering..." : "Convert to images"}
         </PrimaryButton>
       ) : null}

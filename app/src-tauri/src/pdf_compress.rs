@@ -27,7 +27,7 @@ pub struct CompressResult {
 
 /// Render scale (≈ dpi / 72) and JPEG quality per level. Higher level = smaller
 /// file, lower fidelity. Unknown levels fall back to `balanced`. Pure → unit-tested.
-fn compress_params(level: &str) -> (f32, u8) {
+fn pdf_compress_params(level: &str) -> (f32, u8) {
     match level {
         "light" => (2.0, 80),
         "strong" => (1.0, 50),
@@ -47,7 +47,7 @@ pub fn compress_pdf(
     out_path: String,
     level: String,
 ) -> Result<CompressResult, String> {
-    let (scale, quality) = compress_params(&level);
+    let (scale, quality) = pdf_compress_params(&level);
     let pdfium = bind_pdfium(&app)?;
     let doc = pdfium
         .load_pdf_from_file(Path::new(&path), None)
@@ -63,24 +63,13 @@ pub fn compress_pdf(
             .render_with_config(&config)
             .map_err(|e| format!("decode failed: {e}"))?
             .as_image()
+            .map_err(|e| format!("decode failed: {e}"))?
             .into_rgb8();
         let (px_w, px_h) = (rgb.width() as usize, rgb.height() as usize);
         let jpeg = encode_jpeg(&rgb, quality)?;
         // Page is sized from the source; the render scale maps px back at 72*scale dpi.
         let transform = ImageTransform { dpi: Some(72.0 * scale), ..Default::default() };
-
-        match &out {
-            None => {
-                let (doc_ref, p, l) =
-                    printpdf::PdfDocument::new("Toolzy", Mm(w_mm), Mm(h_mm), "Layer 1");
-                embed_jpeg(&doc_ref, p, l, px_w, px_h, jpeg, transform);
-                out = Some(doc_ref);
-            }
-            Some(doc_ref) => {
-                let (p, l) = doc_ref.add_page(Mm(w_mm), Mm(h_mm), "Layer 1");
-                embed_jpeg(doc_ref, p, l, px_w, px_h, jpeg, transform);
-            }
-        }
+        append_jpeg_page(&mut out, (w_mm, h_mm), (px_w, px_h), jpeg, transform);
     }
 
     let pdf = out.ok_or("empty pdf")?;
@@ -129,32 +118,70 @@ pub(crate) fn embed_jpeg(
     Image::from(xobject).add_to_layer(doc.get_page(page).get_layer(layer), transform);
 }
 
+/// Append one JPEG page to an incrementally-built document: create it on the first
+/// page (`out` is `None`), add a page on every call after. `page_mm` sizes the page;
+/// `px` is the embedded image's pixel size. Shared by compress (rasterized pages) and
+/// images→PDF (`pdf_build`) so the new-vs-add-page split lives in one place.
+pub(crate) fn append_jpeg_page(
+    out: &mut Option<PdfDocumentReference>,
+    page_mm: (f32, f32),
+    px: (usize, usize),
+    jpeg: Vec<u8>,
+    transform: ImageTransform,
+) {
+    let (w_mm, h_mm) = page_mm;
+    let (px_w, px_h) = px;
+    match out {
+        None => {
+            let (doc, p, l) = printpdf::PdfDocument::new("Toolzy", Mm(w_mm), Mm(h_mm), "Layer 1");
+            embed_jpeg(&doc, p, l, px_w, px_h, jpeg, transform);
+            *out = Some(doc);
+        }
+        Some(doc) => {
+            let (p, l) = doc.add_page(Mm(w_mm), Mm(h_mm), "Layer 1");
+            embed_jpeg(doc, p, l, px_w, px_h, jpeg, transform);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn light_keeps_most_quality() {
-        assert_eq!(compress_params("light"), (2.0, 80));
+        assert_eq!(pdf_compress_params("light"), (2.0, 80));
     }
 
     #[test]
     fn strong_compresses_hardest() {
-        assert_eq!(compress_params("strong"), (1.0, 50));
+        assert_eq!(pdf_compress_params("strong"), (1.0, 50));
     }
 
     #[test]
     fn unknown_level_falls_back_to_balanced() {
-        assert_eq!(compress_params("nonsense"), (1.5, 65));
-        assert_eq!(compress_params("balanced"), (1.5, 65));
+        assert_eq!(pdf_compress_params("nonsense"), (1.5, 65));
+        assert_eq!(pdf_compress_params("balanced"), (1.5, 65));
     }
 
     #[test]
     fn higher_level_means_smaller_scale_and_quality() {
-        let (sl, ql) = compress_params("light");
-        let (sb, qb) = compress_params("balanced");
-        let (ss, qs) = compress_params("strong");
+        let (sl, ql) = pdf_compress_params("light");
+        let (sb, qb) = pdf_compress_params("balanced");
+        let (ss, qs) = pdf_compress_params("strong");
         assert!(sl > sb && sb > ss, "scale must decrease light→strong");
         assert!(ql > qb && qb > qs, "quality must decrease light→strong");
+    }
+
+    #[test]
+    fn append_jpeg_page_creates_then_extends() {
+        // First call builds the document (None → Some); the next keeps it (add_page).
+        let rgb = image::RgbImage::from_pixel(2, 2, image::Rgb([10, 20, 30]));
+        let jpeg = encode_jpeg(&rgb, 80).unwrap();
+        let mut out: Option<PdfDocumentReference> = None;
+        append_jpeg_page(&mut out, (50.0, 50.0), (2, 2), jpeg.clone(), ImageTransform::default());
+        assert!(out.is_some(), "first call creates the document");
+        append_jpeg_page(&mut out, (50.0, 50.0), (2, 2), jpeg, ImageTransform::default());
+        assert!(out.is_some(), "second call keeps the document");
     }
 }

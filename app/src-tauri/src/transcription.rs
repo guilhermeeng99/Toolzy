@@ -110,8 +110,8 @@ fn format_ext(format: &str) -> Option<&'static str> {
 }
 
 /// Transcript path beside the input: `clip.mp3` + `srt` → `clip.srt`. `None` for an
-/// unknown format. Pure → unit-tested.
-fn output_path(src: &Path, format: &str) -> Option<PathBuf> {
+/// unknown format. Pure → unit-tested. (Named apart from `image_convert::output_path`.)
+fn transcript_output_path(src: &Path, format: &str) -> Option<PathBuf> {
     format_ext(format).map(|ext| src.with_extension(ext))
 }
 
@@ -185,9 +185,16 @@ fn require_model(app: &AppHandle, model: &str) -> Result<PathBuf, String> {
     }
 }
 
+/// The deterministic stem of the temp WAV name (the input's file stem, or "audio"
+/// when the path has none). Split out so it's unit-testable apart from the nanos
+/// suffix below. Pure → unit-tested.
+fn wav_stem(input: &Path) -> &str {
+    input.file_stem().and_then(|s| s.to_str()).unwrap_or("audio")
+}
+
 /// A unique temp WAV path for the 16 kHz mono intermediate.
 fn temp_wav_path(input: &Path) -> PathBuf {
-    let stem = input.file_stem().and_then(|s| s.to_str()).unwrap_or("audio");
+    let stem = wav_stem(input);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
@@ -278,12 +285,18 @@ fn download_file(
     dest: &Path,
     progress: Option<&Channel<DownloadProgress>>,
 ) -> Result<(), String> {
+    // ureq 3: headers come from the `http` crate (case-insensitive keys), and the
+    // body is read via `into_body().into_reader()` (the old `.into_reader()` is gone).
     let resp = ureq::get(url).call().map_err(|e| format!("download failed: {e}"))?;
-    let total: Option<u64> = resp.header("Content-Length").and_then(|s| s.parse().ok());
+    let total: Option<u64> = resp
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse().ok());
 
     let part = dest.with_extension("part");
     let mut file = std::fs::File::create(&part).map_err(|e| e.to_string())?;
-    let mut reader = resp.into_reader();
+    let mut reader = resp.into_body().into_reader();
     let mut buf = [0u8; 65536];
     let mut downloaded = 0u64;
 
@@ -400,25 +413,27 @@ fn find_file(dir: &Path, name: &str) -> Option<PathBuf> {
     None
 }
 
-/// Download + extract the GPU build into `dir` (keeping whisper-cli.exe + its DLLs).
-fn install_gpu_engine(dir: &Path, on_progress: &Channel<DownloadProgress>) -> Result<(), String> {
-    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let zip = dir.join("engine.zip");
-    download_file(GPU_URL, &zip, Some(on_progress))?;
-
-    let tmp = dir.join("extract");
-    let _ = std::fs::remove_dir_all(&tmp);
-    std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
-    let extracted = std::process::Command::new("tar")
+/// Extract `zip` into a fresh `tmp` dir. Uses the platform `tar` — on Windows that is
+/// bsdtar (ships with Windows 10+), which also unpacks `.zip`, so no extra crate.
+fn extract_zip(zip: &Path, tmp: &Path) -> Result<(), String> {
+    let _ = std::fs::remove_dir_all(tmp);
+    std::fs::create_dir_all(tmp).map_err(|e| e.to_string())?;
+    let ok = std::process::Command::new("tar")
         .args(["-xf", &zip.to_string_lossy(), "-C", &tmp.to_string_lossy()])
         .status()
         .map_err(|e| format!("extract failed: {e}"))?
         .success();
-    if !extracted {
-        return Err("extract failed".into());
+    if ok {
+        Ok(())
+    } else {
+        Err("extract failed".into())
     }
+}
 
-    let exe = find_file(&tmp, "whisper-cli.exe").ok_or("whisper-cli.exe not in archive")?;
+/// Copy the engine's `whisper-cli.exe` + its sibling DLLs from the extracted tree
+/// (located by finding the exe) into `dest`.
+fn copy_engine_files(extracted: &Path, dest: &Path) -> Result<(), String> {
+    let exe = find_file(extracted, "whisper-cli.exe").ok_or("whisper-cli.exe not in archive")?;
     let src = exe.parent().ok_or("bad archive layout")?;
     for entry in std::fs::read_dir(src).map_err(|e| e.to_string())?.flatten() {
         let name = entry.file_name();
@@ -426,9 +441,22 @@ fn install_gpu_engine(dir: &Path, on_progress: &Channel<DownloadProgress>) -> Re
             .to_str()
             .is_some_and(|n| n == "whisper-cli.exe" || n.to_ascii_lowercase().ends_with(".dll"));
         if keep {
-            std::fs::copy(entry.path(), dir.join(&name)).map_err(|e| e.to_string())?;
+            std::fs::copy(entry.path(), dest.join(&name)).map_err(|e| e.to_string())?;
         }
     }
+    Ok(())
+}
+
+/// Download + extract the GPU build into `dir` (keeping whisper-cli.exe + its DLLs).
+fn install_gpu_engine(dir: &Path, on_progress: &Channel<DownloadProgress>) -> Result<(), String> {
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let zip = dir.join("engine.zip");
+    download_file(GPU_URL, &zip, Some(on_progress))?;
+
+    let tmp = dir.join("extract");
+    extract_zip(&zip, &tmp)?;
+    copy_engine_files(&tmp, dir)?;
+
     let _ = std::fs::remove_dir_all(&tmp);
     let _ = std::fs::remove_file(&zip);
     Ok(())
@@ -454,6 +482,29 @@ fn run_gpu_blocking(exe: &Path, args: &[String]) -> Result<String, String> {
             log.lines().last().unwrap_or("unknown error")
         ))
     }
+}
+
+/// Recognize speech: the installed GPU engine (≈7–10× faster on 1–2 min clips, no
+/// streamed progress) when present, else the bundled CPU sidecar (streams progress +
+/// supports Cancel). Clears the cancel slot when the child finishes or is killed.
+/// Returns the stderr log (for language detection) or the failure tail.
+async fn recognize(
+    app: &AppHandle,
+    args: Vec<String>,
+    on_progress: &Channel<TranscribeProgress>,
+    child_slot: &Mutex<Option<CommandChild>>,
+) -> Result<String, String> {
+    let gpu = gpu_exe(app)?;
+    let recognized = if gpu.exists() {
+        let gpu_args = args.clone();
+        tauri::async_runtime::spawn_blocking(move || run_gpu_blocking(&gpu, &gpu_args))
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        run_whisper(app, args, on_progress, child_slot).await
+    };
+    *child_slot.lock().map_err(|_| "transcription state lock poisoned".to_string())? = None;
+    recognized
 }
 
 /// Whether an NVIDIA GPU is present and whether the GPU engine is installed.
@@ -512,7 +563,7 @@ pub async fn transcribe_audio(
         return Err(format!("unknown task: {task}"));
     }
     let src = Path::new(&path);
-    let out = output_path(src, &format).ok_or_else(|| format!("unknown format: {format}"))?;
+    let out = transcript_output_path(src, &format).ok_or_else(|| format!("unknown format: {format}"))?;
     let model_path = require_model(&app, &model)?;
     let vad_path = models_dir(&app)?.join(VAD_FILENAME);
     if !vad_path.exists() {
@@ -532,21 +583,8 @@ pub async fn transcribe_audio(
     let args = whisper_args(
         &wav, &model_path, &vad_path, &out_base, language.as_deref(), &task, &format, threads,
     );
-    // Use the GPU engine when installed (≈7–10× faster on 1–2 min clips); otherwise
-    // the bundled CPU sidecar (which streams progress + supports cancel).
-    let gpu = gpu_exe(&app)?;
-    let recognized = if gpu.exists() {
-        let gpu_args = args.clone();
-        tauri::async_runtime::spawn_blocking(move || run_gpu_blocking(&gpu, &gpu_args))
-            .await
-            .map_err(|e| e.to_string())?
-    } else {
-        run_whisper(&app, args, &on_progress, &state.child).await
-    };
-    // child finished or was killed; clear the slot
-    *state.child.lock().map_err(|_| "transcription state lock poisoned".to_string())? = None;
-    let _ = std::fs::remove_file(&wav); // always clean up the temp WAV
-
+    let recognized = recognize(&app, args, &on_progress, &state.child).await;
+    let _ = std::fs::remove_file(&wav); // always clean up the temp WAV (success or error)
     let stderr = recognized?;
     Ok(build_result(&out, language, &stderr))
 }
@@ -588,15 +626,22 @@ mod tests {
     }
 
     #[test]
-    fn output_path_swaps_extension_per_format() {
-        assert_eq!(output_path(Path::new("/a/clip.mp3"), "srt").unwrap(), PathBuf::from("/a/clip.srt"));
-        assert_eq!(output_path(Path::new("/a/clip.mp3"), "txt").unwrap(), PathBuf::from("/a/clip.txt"));
-        assert_eq!(output_path(Path::new("/a/clip.mp3"), "json").unwrap(), PathBuf::from("/a/clip.json"));
+    fn wav_stem_uses_filename_or_audio_fallback() {
+        assert_eq!(wav_stem(Path::new("/a/clip.mp3")), "clip");
+        assert_eq!(wav_stem(Path::new("clip.wav")), "clip");
+        assert_eq!(wav_stem(Path::new("")), "audio");
     }
 
     #[test]
-    fn output_path_unknown_format_is_none() {
-        assert!(output_path(Path::new("/a/clip.mp3"), "doc").is_none());
+    fn transcript_output_path_swaps_extension_per_format() {
+        assert_eq!(transcript_output_path(Path::new("/a/clip.mp3"), "srt").unwrap(), PathBuf::from("/a/clip.srt"));
+        assert_eq!(transcript_output_path(Path::new("/a/clip.mp3"), "txt").unwrap(), PathBuf::from("/a/clip.txt"));
+        assert_eq!(transcript_output_path(Path::new("/a/clip.mp3"), "json").unwrap(), PathBuf::from("/a/clip.json"));
+    }
+
+    #[test]
+    fn transcript_output_path_unknown_format_is_none() {
+        assert!(transcript_output_path(Path::new("/a/clip.mp3"), "doc").is_none());
     }
 
     #[test]

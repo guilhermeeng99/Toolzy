@@ -66,7 +66,7 @@ fn concat_list(paths: &[String]) -> String;  // ffmpeg concat-demuxer list-file 
 fn rotate_filter(degrees: u32) -> Option<String>;
 fn mirror_filter(direction: &str) -> Option<&str>;
 fn video_speed_filter(factor: f64) -> String; // setpts + atempo_chain
-fn compress_params(level: &str) -> (u8, Option<&str>, &str); // crf, downscale filter, audio kbps
+fn video_compress_params(level: &str) -> (u8, Option<&str>, &str); // crf, downscale filter, audio kbps
 fn compress_args(path: &str, level: &str, out: &str) -> Vec<String>; // libx264/CRF/AAC mp4
 fn compressed_out(src: &Path) -> PathBuf; // <base>-compressed.mp4 beside the input
 ```
@@ -177,7 +177,7 @@ input — no save dialog).
   - [x] `rotate_filter` (90/180/270 + invalid) and `mirror_filter` (h/v + invalid).
   - [x] `video_speed_filter` — `setpts` factor + `atempo` chain.
   - [x] trim / merge / add-audio / rotate / mirror / speed arg builders.
-  - [x] `compress_params` (light/balanced/strong + unknown→balanced) and `compress_args`
+  - [x] `video_compress_params` (light/balanced/strong + unknown→balanced) and `compress_args`
         (libx264/CRF/faststart; strong adds the downscale `-vf`).
   - [x] range + value validation returns the documented `Err` strings.
 - **Manual / runtime** (needs the ffmpeg sidecar):

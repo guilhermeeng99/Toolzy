@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DownloadProgress } from "../lib/media";
+import { baseName } from "../lib/path";
 import { formatTime } from "../lib/time";
 import {
   type GpuStatus,
@@ -11,6 +12,7 @@ import {
   cancelTranscription,
   transcribeAudio,
 } from "../lib/transcribe";
+import { useElapsedSeconds } from "../lib/useElapsedSeconds";
 import { useGpuEngine } from "../lib/useGpuEngine";
 import { useSingleFile } from "../lib/useSingleFile";
 import { useWhisperModels } from "../lib/useWhisperModels";
@@ -28,7 +30,6 @@ const LANGUAGES = [
   { code: "it", label: "Italian" },
 ] as const;
 
-const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 const modelSize = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`);
 
 export function TranscribeTool() {
@@ -53,16 +54,9 @@ export function TranscribeTool() {
 
   const [busy, setBusy] = useState(false);
   const [tProgress, setTProgress] = useState<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-
-  // Tick a visible elapsed timer while transcribing — short clips emit no granular
-  // % from whisper-cli, so the timer is the main "it's alive" signal.
-  useEffect(() => {
-    if (!busy) return;
-    setElapsed(0);
-    const id = window.setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [busy]);
+  // Short clips emit no granular % from whisper-cli, so the timer is the main
+  // "it's alive" signal while busy.
+  const elapsed = useElapsedSeconds(busy);
 
   useEffect(() => {
     localStorage.setItem("toolzy.transcribe.lang", language);

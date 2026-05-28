@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { baseName, stripExt } from "../../lib/path";
 import { PDF_EXTENSIONS } from "../../lib/pdf";
 import { useSingleFile } from "../../lib/useSingleFile";
-import { Card, Field, PasswordInput, PrimaryButton, dropzoneClass } from "../ui";
+import { Card, Field, FileDropzone, PasswordInput, PrimaryButton } from "../ui";
 
 /** Shared shell for the password modes (Protect / Unlock): pick one PDF, enter a
  *  password, save the result. `run` is the lib wrapper for the matching command. */
@@ -57,17 +57,13 @@ export function PasswordPdfTool({
         <p className="text-body text-slate-blue">{hint}</p>
       </Card>
 
-      <button
-        type="button"
-        onClick={choose}
-        className={dropzoneClass(over)}
-        aria-label="Choose or drop a PDF"
-      >
-        <span className="text-body-lg font-semibold text-midnight-indigo">
-          {path ? baseName(path) : "Drop a PDF here, or click to choose"}
-        </span>
-        <span className="text-body text-slate-blue">Processed natively on your machine</span>
-      </button>
+      <FileDropzone
+        over={over}
+        onChoose={choose}
+        label={path ? baseName(path) : "Drop a PDF here, or click to choose"}
+        hint="Processed natively on your machine"
+        ariaLabel="Choose or drop a PDF"
+      />
 
       {path ? (
         <PrimaryButton onClick={go} disabled={busy || !password}>

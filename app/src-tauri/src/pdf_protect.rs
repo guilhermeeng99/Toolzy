@@ -1,4 +1,5 @@
 use crate::qpdf::run_qpdf;
+use crate::validate::require_password;
 
 /// qpdf args to AES-256-encrypt `input` into `out`, using `password` as both the
 /// user (open) and owner password. The traditional positional `--encrypt u o len`
@@ -40,9 +41,7 @@ pub async fn add_pdf_password(
     password: String,
     out_path: String,
 ) -> Result<String, String> {
-    if password.is_empty() {
-        return Err("password required".into());
-    }
+    require_password(&password)?;
     run_qpdf(&app, encrypt_args(&password, &path, &out_path)).await?;
     Ok(out_path)
 }
@@ -57,9 +56,7 @@ pub async fn remove_pdf_password(
     password: String,
     out_path: String,
 ) -> Result<String, String> {
-    if password.is_empty() {
-        return Err("password required".into());
-    }
+    require_password(&password)?;
     run_qpdf(&app, decrypt_args(&password, &path, &out_path))
         .await
         .map_err(|e| {

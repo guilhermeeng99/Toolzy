@@ -91,13 +91,19 @@ async fn remove_pdf_password(app, path: String, password: String, out_path: Stri
   - merge: `["--empty", "--pages", in1, in2, …, "--", out]`
   - encrypt: `["--encrypt", pw, pw, "256", "--", in, out]` (user = owner = the entered password)
   - decrypt: `["--password=" + pw, "--decrypt", "--", in, out]`
-- **Compress level → render params** (pure `compress_params`):
+- **Compress level → render params** (pure `pdf_compress_params`):
   | level | page scale (≈dpi) | JPEG quality |
   |---|---|---|
   | `light` | 2.0 (~144) | 80 |
   | `balanced` | 1.5 (~108) | 65 |
   | `strong` | 1.0 (~72) | 50 |
 - UI wrappers: `app/src/lib/pdf.ts`.
+- **Engine versions / deferred upgrade** — `pdfium-render` is on 0.9 (runtime pdfium lib);
+  `printpdf` is **held at 0.7**. printpdf 0.8/0.9 is a ground-up rewrite (`PdfDocument::new(str)`
+  + `add_image`→`XObjectId` + `Op::UseXobject` + `Vec<Op>` pages; `ImageTransform`→
+  `XObjectTransform`) and embeds images via `RawImage::decode_from_bytes` (which **decodes** the
+  JPEG) instead of the current direct DCTDecode embed — this changes `compress_pdf`'s output size,
+  so the bump is deferred until a visual smoke-test confirms parity.
 
 ---
 
@@ -195,8 +201,8 @@ Idle → (pick / drop) → Ready → Running(busy) → Done(saved path) | Error(
 
 - **Rust** (`cargo test`):
   - [ ] qpdf arg builders: merge / encrypt / decrypt produce the expected token order
-  - [ ] `compress_params` maps each level to the right (scale, quality) and is monotonic
-  - [ ] `compress_params` falls back to `balanced` for an unknown level
+  - [ ] `pdf_compress_params` maps each level to the right (scale, quality) and is monotonic
+  - [ ] `pdf_compress_params` falls back to `balanced` for an unknown level
 - **Manual / runtime** (needs pdfium + the qpdf sidecar):
   - [ ] merge N PDFs in a chosen order → one PDF with pages in that order
   - [ ] compress at each level → smaller file; before/after shown

@@ -273,6 +273,57 @@ fn drain_progress(bytes: &[u8], on_progress: &Channel<DownloadProgress>) -> Opti
     text
 }
 
+/// Spawn yt-dlp, stream progress to `on_progress`, and return the final printed file
+/// path (the last non-progress stdout line), or `None` if it printed none. A non-zero
+/// exit maps to `Err` with the stderr tail. Keeps `download_media` to validate → args →
+/// run → default path. Needs the yt-dlp sidecar (`shell:allow-spawn`).
+async fn run_download(
+    app: &tauri::AppHandle,
+    args: Vec<String>,
+    on_progress: &Channel<DownloadProgress>,
+) -> Result<Option<String>, String> {
+    // yt-dlp is a frozen-Python exe; when its stdout is a pipe (not a TTY) Python
+    // block-buffers it, so progress lines would arrive in one burst at exit (bar
+    // jumps 0 → done). PYTHONUNBUFFERED makes them flush live, line by line.
+    let (mut rx, _child) = app
+        .shell()
+        .sidecar("yt-dlp")
+        .map_err(|e| e.to_string())?
+        .env("PYTHONUNBUFFERED", "1")
+        .args(args)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let mut path_line: Option<String> = None;
+    let mut error_tail = String::new();
+
+    while let Some(event) = rx.recv().await {
+        match event {
+            // yt-dlp writes both the `--progress-template` lines and the
+            // `--print after_move:filepath` path to stdout; the path is the last
+            // non-progress line.
+            CommandEvent::Stdout(bytes) => {
+                if let Some(text) = drain_progress(&bytes, on_progress) {
+                    path_line = Some(text);
+                }
+            }
+            // Real errors land on stderr; keep the last line for the failure message.
+            CommandEvent::Stderr(bytes) => {
+                if let Some(text) = drain_progress(&bytes, on_progress) {
+                    error_tail = text;
+                }
+            }
+            CommandEvent::Terminated(payload) if payload.code != Some(0) => {
+                let reason = if error_tail.is_empty() { "unknown error" } else { &error_tail };
+                return Err(format!("Download failed. {reason}"));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(path_line)
+}
+
 /// Download a URL as mp4/mp3 with the bundled yt-dlp + ffmpeg sidecars. `height`
 /// caps the MP4 resolution; `audio_bitrate` sets the MP3 kbps. Progress is streamed
 /// to `on_progress` as it downloads (MP4 has two phases — video then audio — so the
@@ -297,45 +348,7 @@ pub async fn download_media(
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let args = build_ytdlp_args(template, exe.parent(), &format, height, audio_bitrate, url);
 
-    // yt-dlp is a frozen-Python exe; when its stdout is a pipe (not a TTY) Python
-    // block-buffers it, so progress lines would arrive in one burst at exit (bar
-    // jumps 0 → done). PYTHONUNBUFFERED makes them flush live, line by line.
-    let (mut rx, _child) = app
-        .shell()
-        .sidecar("yt-dlp")
-        .map_err(|e| e.to_string())?
-        .env("PYTHONUNBUFFERED", "1")
-        .args(args)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-
-    let mut path_line: Option<String> = None;
-    let mut error_tail = String::new();
-
-    while let Some(event) = rx.recv().await {
-        match event {
-            // yt-dlp writes both the `--progress-template` lines and the
-            // `--print after_move:filepath` path to stdout; the path is the last
-            // non-progress line.
-            CommandEvent::Stdout(bytes) => {
-                if let Some(text) = drain_progress(&bytes, &on_progress) {
-                    path_line = Some(text);
-                }
-            }
-            // Real errors land on stderr; keep the last line for the failure message.
-            CommandEvent::Stderr(bytes) => {
-                if let Some(text) = drain_progress(&bytes, &on_progress) {
-                    error_tail = text;
-                }
-            }
-            CommandEvent::Terminated(payload) if payload.code != Some(0) => {
-                let reason = if error_tail.is_empty() { "unknown error" } else { &error_tail };
-                return Err(format!("Download failed. {reason}"));
-            }
-            _ => {}
-        }
-    }
-
+    let path_line = run_download(&app, args, &on_progress).await?;
     Ok(path_line.unwrap_or_else(|| downloads.to_string_lossy().to_string()))
 }
 

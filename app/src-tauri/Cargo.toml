@@ -26,10 +26,17 @@ image = "0.25"
 webp = "0.3"
 # Native PDF. pdfium-render loads the pdfium library at runtime (shipped beside the
 # exe / fetched); printpdf builds PDFs from images (pure Rust).
-pdfium-render = "0.8"
+pdfium-render = "0.9"
+# Held at 0.7: printpdf 0.8/0.9 is a ground-up rewrite (PdfDocument::new(str) +
+# add_image -> XObjectId + Op::UseXobject + Vec<Op> pages; ImageTransform ->
+# XObjectTransform) and embeds images via RawImage::decode_from_bytes (decodes the
+# JPEG) rather than the current direct DCTDecode embed — which changes compress_pdf's
+# output size in a way that needs a visual smoke-test before adopting. TODO: migrate
+# as a scoped pass (see docs/specs/pdf-tools.md).
 printpdf = "0.7"
 # Thumbnails (image + PDF page) are returned to the webview as PNG data URLs.
 base64 = "0.22"
 # On-demand download of Whisper models (transcription). Blocking + tiny dep tree
-# (no async stack), called off the runtime via spawn_blocking.
-ureq = "2"
+# (no async stack), called off the runtime via spawn_blocking. v3 is built on the
+# `http` crate (rustls TLS by default).
+ureq = "3"

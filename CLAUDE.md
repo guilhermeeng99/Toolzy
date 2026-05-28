@@ -28,10 +28,11 @@ natively); the **React + TypeScript (Vite)** UI is a thin webview front-end. See
 app/
   src/                # React + TS UI (Vite). Presentation only.
     components/        #   tools (ImageTool, PdfTool, MediaTool, VideoTool, DownloadTool)
-                       #     + pdf/ media/ video/ submodes, TranscribeTool, EditPanel, TimeRange, shared ui.tsx
-    lib/               #   invoke() wrappers + shared hooks/helpers (convert, pdf, media,
-                       #     audioEdit, videoEdit, transcribe, format, path, time, update, useFileDrop,
-                       #     useBatchQueue, useFileEdit, useSingleFile, useTrim, usePdfItems)
+                       #     + pdf/ media/ video/ submodes + shared components
+                       #     (BatchPanel, DownloadBar, EditPanel, TimeRange, TranscribeTool, ui.tsx)
+    lib/               #   typed invoke() wrappers (one per command group) + shared
+                       #     hooks/helpers (format, path, time, update + use* hooks for file
+                       #     pick/drop/edit, batch, trim, pdf items, whisper models, gpu engine)
   src-tauri/          # Rust = the engine
     src/
       lib.rs           #   Tauri builder + command registry

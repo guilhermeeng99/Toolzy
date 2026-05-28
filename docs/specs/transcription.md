@@ -133,7 +133,7 @@ fn whisper_args(wav: &Path, model: &Path, vad_model: &Path, out_base: &Path,
                 language: Option<&str>, task: &str, format: &str, threads: usize) -> Vec<String>;
 // always emits VAD + greedy/temperature 0 + max-context 0 (anti-hallucination; rules 11–12)
 // + --print-progress (UI %) + -t <threads>; JSON uses -oj (not -ojson)
-fn output_path(src: &Path, format: &str) -> PathBuf; // base.<format-ext>, beside input
+fn transcript_output_path(src: &Path, format: &str) -> Option<PathBuf>; // base.<ext>, beside input; None if format unknown
 ```
 
 - **Preprocess**: `ffmpeg -y -i <in> -ar 16000 -ac 1 -c:a pcm_s16le <temp.wav>` via the shared
@@ -172,7 +172,7 @@ Numbered, testable.
    `pcm_s16le` WAV (ffmpeg). Anything ffmpeg can demux is accepted; a demux failure surfaces the
    ffmpeg stderr tail.
 2. **Output name** = input base + the format's extension, in the input's directory
-   (`output_path`): `txt`→`.txt`, `srt`→`.srt`, `vtt`→`.vtt`, `json`→`.json`. Default format =
+   (`transcript_output_path`): `txt`→`.txt`, `srt`→`.srt`, `vtt`→`.vtt`, `json`→`.json`. Default format =
    `txt`.
 3. **Model required on disk** — `transcribe_audio` checks `models/ggml-<id>.bin` exists; if not →
    `Err("model not downloaded: <id>")` **before** spawning anything. `model_url`/`model_filename`
@@ -296,7 +296,7 @@ the component — it calls `lib/transcribe.ts`.
 
 - **Rust** (`cargo test`):
   - [ ] `model_url` / `model_filename` — known ids map to the HF URL + `ggml-<id>.bin`; unknown → `None`.
-  - [ ] `output_path` — keeps the input dir, swaps to the format extension, per format.
+  - [ ] `transcript_output_path` — keeps the input dir, swaps to the format extension, per format.
   - [ ] `whisper_args` — builds `-m/-f/-l/-t/-of/-o<fmt>`; **always emits VAD + greedy + max-context 0 + --print-progress** (rules 11–12); `translate` adds `--translate`; JSON → `-oj`; `auto` vs forced language.
   - [ ] each `Err(String)` path: unknown model/task/format, model-not-downloaded.
   - [ ] `parse_whisper_progress` — `progress = N%` → `N`; a non-progress line → `None`.
