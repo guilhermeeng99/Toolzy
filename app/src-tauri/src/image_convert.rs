@@ -1,8 +1,11 @@
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat, ImageReader};
 use serde::{Deserialize, Serialize};
+
+use crate::ffmpeg::run_ffmpeg;
 
 /// Resize request from the UI. `mode`: "none" | "px" | "percent".
 #[derive(Debug, Default, Deserialize)]
@@ -31,7 +34,8 @@ pub struct ConvertResult {
 /// Targets: png, jpg, webp, gif, bmp, tiff. `quality` (1..100) applies to the
 /// lossy targets (jpg, webp).
 #[tauri::command]
-pub fn convert_image(
+pub async fn convert_image(
+    app: tauri::AppHandle,
     path: String,
     target: String,
     quality: Option<u8>,
@@ -40,12 +44,7 @@ pub fn convert_image(
     let src = Path::new(&path);
     let in_bytes = std::fs::metadata(src).map(|m| m.len()).unwrap_or(0);
 
-    let mut img: DynamicImage = ImageReader::open(src)
-        .map_err(|e| format!("open failed: {e}"))?
-        .with_guessed_format()
-        .map_err(|e| format!("read failed: {e}"))?
-        .decode()
-        .map_err(|e| format!("decode failed: {e}"))?;
+    let mut img = decode_source_image(&app, src).await?;
 
     if let Some(r) = resize.filter(|r| r.mode != "none") {
         let (w, h) = target_dimensions(img.width(), img.height(), &r);
@@ -63,6 +62,70 @@ pub fn convert_image(
     })
 }
 
+async fn decode_source_image(app: &tauri::AppHandle, src: &Path) -> Result<DynamicImage, String> {
+    if is_heic_source(src) {
+        decode_heic_with_ffmpeg(app, src).await
+    } else {
+        decode_standard_image(src)
+    }
+}
+
+fn decode_standard_image(src: &Path) -> Result<DynamicImage, String> {
+    ImageReader::open(src)
+        .map_err(|e| format!("open failed: {e}"))?
+        .with_guessed_format()
+        .map_err(|e| format!("read failed: {e}"))?
+        .decode()
+        .map_err(|e| format!("decode failed: {e}"))
+}
+
+async fn decode_heic_with_ffmpeg(
+    app: &tauri::AppHandle,
+    src: &Path,
+) -> Result<DynamicImage, String> {
+    let tmp = temp_png_path(src);
+    let args = heic_decode_args(src, &tmp);
+
+    if let Err(e) = run_ffmpeg(app, args).await {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("decode failed: {e}"));
+    }
+
+    let decoded = decode_standard_image(&tmp);
+    let _ = std::fs::remove_file(&tmp);
+    decoded
+}
+
+fn heic_decode_args(src: &Path, tmp: &Path) -> Vec<String> {
+    vec![
+        "-y".to_string(),
+        "-i".to_string(),
+        src.to_string_lossy().to_string(),
+        "-frames:v".to_string(),
+        "1".to_string(),
+        "-pix_fmt".to_string(),
+        "rgba".to_string(),
+        "-update".to_string(),
+        "1".to_string(),
+        tmp.to_string_lossy().to_string(),
+    ]
+}
+
+fn is_heic_source(src: &Path) -> bool {
+    src.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("heic") || e.eq_ignore_ascii_case("heif"))
+}
+
+fn temp_png_path(src: &Path) -> PathBuf {
+    let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    std::env::temp_dir().join(format!("toolzy-{stem}-{nonce}.png"))
+}
+
 /// Encode `img` to `target`. JPEG/WebP honor `quality` (1..100); JPEG drops alpha.
 fn encode(img: &DynamicImage, target: &str, quality: Option<u8>, out: &Path) -> Result<(), String> {
     match target {
@@ -72,12 +135,14 @@ fn encode(img: &DynamicImage, target: &str, quality: Option<u8>, out: &Path) -> 
             let mut file =
                 std::io::BufWriter::new(std::fs::File::create(out).map_err(|e| e.to_string())?);
             let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut file, q);
-            enc.encode_image(&rgb).map_err(|e| format!("encode failed: {e}"))
+            enc.encode_image(&rgb)
+                .map_err(|e| format!("encode failed: {e}"))
         }
         "webp" => {
             let q = f32::from(quality.unwrap_or(80).clamp(1, 100));
             let rgba = img.to_rgba8();
-            let data = webp::Encoder::from_rgba(rgba.as_raw(), rgba.width(), rgba.height()).encode(q);
+            let data =
+                webp::Encoder::from_rgba(rgba.as_raw(), rgba.width(), rgba.height()).encode(q);
             std::fs::write(out, &*data).map_err(|e| format!("encode failed: {e}"))
         }
         "png" => save(img, ImageFormat::Png, out),
@@ -230,5 +295,19 @@ mod tests {
             output_path(Path::new("/a/b/photo.png"), "webp"),
             PathBuf::from("/a/b/photo.webp")
         );
+    }
+
+    #[test]
+    fn heic_source_matches_case_insensitively() {
+        assert!(is_heic_source(Path::new("photo.heic")));
+        assert!(is_heic_source(Path::new("photo.HEIF")));
+        assert!(!is_heic_source(Path::new("photo.jpg")));
+    }
+
+    #[test]
+    fn heic_decode_lets_ffmpeg_choose_primary_image() {
+        let args = heic_decode_args(Path::new("photo.heic"), Path::new("photo.png"));
+        assert!(!args.contains(&"-map".to_string()));
+        assert!(args.windows(2).any(|w| w == ["-pix_fmt", "rgba"]));
     }
 }

@@ -1,6 +1,6 @@
 # Image Conversion Feature Spec
 
-> **Status**: Shipped (native). PNG/JPG/WebP/GIF/BMP/TIFF + resize/quality, batch, drag-drop.
+> **Status**: Shipped (native). PNG/JPG/WebP/GIF/BMP/TIFF + HEIC/HEIF input, resize/quality, batch, drag-drop.
 > AVIF/JPEG-XL planned.
 > **Last updated**: 2026-05-22
 > **Environment**: desktop (native)
@@ -11,8 +11,8 @@ the source. Nothing is uploaded.
 
 **Scope decisions:**
 
-- **Raster only.** PNG, JPG, WebP, GIF, BMP, TIFF today; AVIF/JPEG-XL later.
-- **Native.** `image` crate for decode + most encodes; `webp` crate (libwebp) for lossy WebP.
+- **Raster only.** PNG, JPG, WebP, GIF, BMP, TIFF today; HEIC/HEIF decode-only; AVIF/JPEG-XL later.
+- **Native.** `image` crate for decode + most encodes; `webp` crate (libwebp) for lossy WebP; bundled `ffmpeg` decodes HEIC/HEIF input into the same Rust pipeline.
 - **Batch in / files out.** Multiple files convert sequentially; each gets its own status.
 - **No editing** (crop/rotate/filters) in V1.
 
@@ -20,13 +20,15 @@ the source. Nothing is uploaded.
 
 ## 1. Supported Formats
 
-Decode: anything `image` reads (incl. webp/avif/ico input). Encode (targets): `png`, `jpg`,
-`webp`, `gif`, `bmp`, `tiff`. The picker also accepts `jpeg`/`tif`/`ico` as input; `ico` is
-**decode-only** (not an output target).
+Decode: anything `image` reads (incl. webp/avif/ico input), plus HEIC/HEIF via bundled
+`ffmpeg`. Encode (targets): `png`, `jpg`, `webp`, `gif`, `bmp`, `tiff`. The picker also
+accepts `jpeg`/`tif`/`ico`/`heic`/`heif` as input; `ico`, `heic`, and `heif` are
+**decode-only** (not output targets).
 
 - **png / gif / bmp / tiff** — `image` crate, lossless.
 - **jpg** — `image` `JpegEncoder` with quality (drops alpha; no transparency).
 - **webp** — `webp` crate (libwebp), lossy with quality.
+- **heic / heif** — decode-only through the bundled `ffmpeg` sidecar, then encode normally.
 - **avif / jxl** — planned (`ravif` / `jpegxl-rs`; heavy native encoders).
 
 ---
@@ -43,7 +45,8 @@ Decode: anything `image` reads (incl. webp/avif/ico input). Encode (targets): `p
 #[derive(Serialize)] struct ConvertResult { path: String, in_bytes: u64, out_bytes: u64 }
 
 #[tauri::command]
-fn convert_image(
+async fn convert_image(
+  app: tauri::AppHandle,
   path: String, target: String, quality: Option<u8>, resize: Option<ResizeOpt>,
 ) -> Result<ConvertResult, String>;
 ```

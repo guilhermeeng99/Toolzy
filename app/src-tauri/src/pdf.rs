@@ -1,28 +1,43 @@
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use pdfium_render::prelude::*;
 use tauri::Manager;
+
+static PDFIUM_BIND_LOCK: Mutex<()> = Mutex::new(());
 
 /// Locate and bind the pdfium library, trying (in order): the bundled resource
 /// dir, the executable's own dir (dev / portable), then a system install.
 /// `pub(crate)` so the compress command can reuse the same lookup.
 pub(crate) fn bind_pdfium(app: &tauri::AppHandle) -> Result<Pdfium, String> {
+    let _guard = PDFIUM_BIND_LOCK
+        .lock()
+        .map_err(|_| "pdfium bind lock poisoned".to_string())?;
     let mut dirs: Vec<PathBuf> = Vec::new();
     if let Ok(res) = app.path().resource_dir() {
         dirs.push(res.join("pdfium"));
         dirs.push(res);
     }
-    if let Some(parent) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
+    if let Some(parent) = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+    {
         dirs.push(parent);
     }
     for dir in dirs {
-        if let Ok(b) = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir)) {
-            return Ok(Pdfium::new(b));
+        match Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&dir)) {
+            Ok(b) => return Ok(Pdfium::new(b)),
+            Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => {
+                return Ok(Pdfium::default());
+            }
+            Err(_) => {}
         }
     }
-    Pdfium::bind_to_system_library()
-        .map(Pdfium::new)
-        .map_err(|e| format!("pdfium library not found: {e}"))
+    match Pdfium::bind_to_system_library() {
+        Ok(b) => Ok(Pdfium::new(b)),
+        Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => Ok(Pdfium::default()),
+        Err(e) => Err(format!("pdfium library not found: {e}")),
+    }
 }
 
 /// Render each PDF page to an image (png | jpg) next to the source file and

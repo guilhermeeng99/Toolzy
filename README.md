@@ -16,7 +16,7 @@ Status: ✅ done · 🚧 in progress · ⬜ planned. See [`docs/ROADMAP.md`](doc
 
 | Feature | Status | Engine |
 |---|---|---|
-| Image convert + resize (PNG/JPG/WebP/GIF/BMP/TIFF), batch, drag-drop | ✅ | Rust `image` + `webp` |
+| Image convert + resize (PNG/JPG/WebP/GIF/BMP/TIFF, HEIC/HEIF input), batch, drag-drop | ✅ | Rust `image` + `webp` + `ffmpeg` |
 | PDF → images (per page) · images → PDF | ✅ | `pdfium-render` · `printpdf` |
 | PDF merge · compress (lossy) | ✅ | `qpdf` · `pdfium`+`printpdf` |
 | PDF protect · unlock (AES-256 password) | ✅ | `qpdf` sidecar |

@@ -7,7 +7,19 @@ export type ImageTarget = (typeof IMAGE_TARGETS)[number];
 export const QUALITY_TARGETS = new Set<ImageTarget>(["jpg", "webp"]);
 
 /** Source extensions accepted by the file picker / drag-drop. */
-export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif", "ico"];
+export const IMAGE_EXTENSIONS = [
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "gif",
+  "bmp",
+  "tiff",
+  "tif",
+  "ico",
+  "heic",
+  "heif",
+];
 
 export type ResizeMode = "none" | "px" | "percent";
 

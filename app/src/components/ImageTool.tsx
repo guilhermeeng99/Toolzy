@@ -123,7 +123,7 @@ export function ImageTool() {
         action="Convert"
         verb="Converting..."
         dropLabel="Drop images here, or click to choose"
-        dropHint="PNG · JPG · WebP · GIF · BMP · TIFF — processed natively on your device"
+        dropHint="PNG · JPG · WebP · GIF · BMP · TIFF · HEIC — processed natively on your device"
         renderDetail={(item) =>
           item.status === "done" && item.inBytes != null && item.outBytes != null ? (
             <>
