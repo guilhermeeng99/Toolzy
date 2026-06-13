@@ -122,7 +122,10 @@ fn parse_probe(json: &str) -> Result<MediaProbe, String> {
             .and_then(Value::as_str)
             .unwrap_or("video")
             .to_string(),
-        thumbnail: v.get("thumbnail").and_then(Value::as_str).map(str::to_string),
+        thumbnail: v
+            .get("thumbnail")
+            .and_then(Value::as_str)
+            .map(str::to_string),
         duration: v.get("duration").and_then(Value::as_f64),
         video: video_options(&formats),
     })
@@ -168,6 +171,24 @@ pub async fn probe_media(app: tauri::AppHandle, url: String) -> Result<MediaProb
 /// final `--print` path), so we can tell progress apart from the path / errors.
 const PROGRESS_PREFIX: &str = "PROG|";
 
+/// Shared yt-dlp flags for live progress + final file path printing. Used by the
+/// downloader and by link transcription, which also needs byte progress while it
+/// fetches temporary audio.
+pub(crate) fn ytdlp_progress_args() -> Vec<String> {
+    vec![
+        "--progress".into(),
+        "--newline".into(),
+        "--progress-template".into(),
+        format!(
+            "download:{PROGRESS_PREFIX}%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s"
+        ),
+        "--quiet".into(),
+        "--no-simulate".into(),
+        "--print".into(),
+        "after_move:filepath".into(),
+    ]
+}
+
 /// Build the yt-dlp argument list. Separate from the command so it stays small
 /// and unit-testable.
 ///
@@ -212,21 +233,7 @@ fn build_ytdlp_args(
 
     // `--progress` forces progress even under `--quiet`; `--newline` keeps each
     // update on its own line (yt-dlp writes these to stdout, like `--print`).
-    args.extend([
-        "--progress".into(),
-        "--newline".into(),
-        "--progress-template".into(),
-        format!(
-            "download:{PROGRESS_PREFIX}%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s"
-        ),
-    ]);
-
-    args.extend([
-        "--quiet".into(),
-        "--no-simulate".into(),
-        "--print".into(),
-        "after_move:filepath".into(),
-    ]);
+    args.extend(ytdlp_progress_args());
     args.push(url);
     args
 }
@@ -277,7 +284,7 @@ fn drain_progress(bytes: &[u8], on_progress: &Channel<DownloadProgress>) -> Opti
 /// path (the last non-progress stdout line), or `None` if it printed none. A non-zero
 /// exit maps to `Err` with the stderr tail. Keeps `download_media` to validate → args →
 /// run → default path. Needs the yt-dlp sidecar (`shell:allow-spawn`).
-async fn run_download(
+pub(crate) async fn run_download(
     app: &tauri::AppHandle,
     args: Vec<String>,
     on_progress: &Channel<DownloadProgress>,
@@ -314,7 +321,11 @@ async fn run_download(
                 }
             }
             CommandEvent::Terminated(payload) if payload.code != Some(0) => {
-                let reason = if error_tail.is_empty() { "unknown error" } else { &error_tail };
+                let reason = if error_tail.is_empty() {
+                    "unknown error"
+                } else {
+                    &error_tail
+                };
                 return Err(format!("Download failed. {reason}"));
             }
             _ => {}
@@ -343,7 +354,10 @@ pub async fn download_media(
     }
 
     let downloads = app.path().download_dir().map_err(|e| e.to_string())?;
-    let template = downloads.join("%(title)s.%(ext)s").to_string_lossy().to_string();
+    let template = downloads
+        .join("%(title)s.%(ext)s")
+        .to_string_lossy()
+        .to_string();
 
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let args = build_ytdlp_args(template, exe.parent(), &format, height, audio_bitrate, url);
@@ -392,7 +406,14 @@ mod tests {
 
     #[test]
     fn ffmpeg_location_passed_when_dir_present() {
-        let a = build_ytdlp_args("out".into(), Some(Path::new("/bin")), "mp3", None, None, "u".into());
+        let a = build_ytdlp_args(
+            "out".into(),
+            Some(Path::new("/bin")),
+            "mp3",
+            None,
+            None,
+            "u".into(),
+        );
         assert!(a.contains(&"--ffmpeg-location".to_string()));
     }
 
@@ -443,8 +464,18 @@ mod tests {
         assert_eq!(
             p.video,
             vec![
-                VideoOption { height: 1080, label: "1080p".into(), ext: "mp4".into(), filesize: Some(10000) },
-                VideoOption { height: 720, label: "720p".into(), ext: "mp4".into(), filesize: Some(6000) },
+                VideoOption {
+                    height: 1080,
+                    label: "1080p".into(),
+                    ext: "mp4".into(),
+                    filesize: Some(10000)
+                },
+                VideoOption {
+                    height: 720,
+                    label: "720p".into(),
+                    ext: "mp4".into(),
+                    filesize: Some(6000)
+                },
             ]
         );
     }
@@ -461,8 +492,9 @@ mod tests {
 
     #[test]
     fn best_audio_size_none_when_no_audio_only_track() {
-        let formats =
-            vec![serde_json::json!({"vcodec": "avc1", "acodec": "none", "height": 720, "filesize": 5000})];
+        let formats = vec![
+            serde_json::json!({"vcodec": "avc1", "acodec": "none", "height": 720, "filesize": 5000}),
+        ];
         assert_eq!(best_audio_size(&formats), None);
     }
 

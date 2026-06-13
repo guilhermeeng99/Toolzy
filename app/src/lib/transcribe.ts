@@ -16,6 +16,16 @@ export interface TranscribeResult {
   language: string;
 }
 
+/** Result of transcribing a link directly to an organized Markdown transcript. */
+export interface LinkTranscribeResult {
+  title: string;
+  sourceUrl: string;
+  text: string;
+  outputPath: string;
+  language: string;
+  segmentCount: number;
+}
+
 /** Live recognition progress (0–100) from whisper-cli `--print-progress`. */
 export interface TranscribeProgress {
   percent: number;
@@ -100,5 +110,26 @@ export function transcribeAudio(
     task: opts?.task,
     format: opts?.format,
     onProgress: channel,
+  });
+}
+
+/** Download a link's best audio, transcribe locally, and save a Markdown transcript. */
+export function transcribeLink(
+  url: string,
+  model: string,
+  opts?: { language?: string },
+  onDownloadProgress?: (p: DownloadProgress) => void,
+  onTranscribeProgress?: (p: TranscribeProgress) => void,
+): Promise<LinkTranscribeResult> {
+  const downloadChannel = new Channel<DownloadProgress>();
+  if (onDownloadProgress) downloadChannel.onmessage = onDownloadProgress;
+  const transcribeChannel = new Channel<TranscribeProgress>();
+  if (onTranscribeProgress) transcribeChannel.onmessage = onTranscribeProgress;
+  return invoke<LinkTranscribeResult>("transcribe_link", {
+    url,
+    model,
+    language: opts?.language,
+    onDownloadProgress: downloadChannel,
+    onTranscribeProgress: transcribeChannel,
   });
 }

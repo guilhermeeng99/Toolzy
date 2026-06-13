@@ -240,11 +240,12 @@ No content-inspecting telemetry; no uploads; no Toolzy server in any path. Valid
 
 Four kinds of outbound request exist, all direct from the user's machine and unrelated to file
 contents: (1) the updater's startup version check against GitHub Releases (ADR-008);
-(2) the downloader's video **thumbnail** in the probe result, loaded from the source host
-(e.g. `i.ytimg.com`) — the same host the download itself hits; (3) the **one-time Whisper
-model download** from Hugging Face when the user clicks Download in the Audio tab's Transcribe mode (model
-weights only — Rust-side via `ureq`, user-initiated; ADR-010); and (4) the **optional one-time
-NVIDIA (CUDA) GPU engine download** (~435 MB) from GitHub Releases — also Rust-side via `ureq` and
-user-initiated (ADR-010). The webview runs under a restrictive **CSP** (`tauri.conf.json` →
+(2) downloader / link-transcription requests to the source host, including the probe thumbnail
+(e.g. `i.ytimg.com`) and the media stream fetched by `yt-dlp`; (3) the **one-time Whisper
+model download** from Hugging Face when the user clicks Download in the Audio tab's Transcribe mode
+or the Download tab's Transcribe link mode (model weights only — Rust-side via `ureq`,
+user-initiated; ADR-010); and (4) the **optional one-time NVIDIA (CUDA) GPU engine download**
+(~435 MB) from GitHub Releases — also Rust-side via `ureq` and user-initiated (ADR-010). The
+webview runs under a restrictive **CSP** (`tauri.conf.json` →
 `app.security.csp`): `default-src 'self'` with remote images allowed (`img-src https: data:`) for
 that thumbnail and no remote scripts.

@@ -2,6 +2,7 @@ mod audio_edit;
 mod download;
 mod ffmpeg;
 mod image_convert;
+mod link_transcription;
 mod media;
 mod pdf;
 mod pdf_build;
@@ -45,6 +46,7 @@ pub fn run() {
             video_edit::compress_video,
             download::probe_media,
             download::download_media,
+            link_transcription::transcribe_link,
             transcription::transcribe_audio,
             transcription::list_whisper_models,
             transcription::download_whisper_model,

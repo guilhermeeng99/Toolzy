@@ -22,6 +22,7 @@ Status: ✅ done · 🚧 in progress · ⬜ planned. See [`docs/ROADMAP.md`](doc
 | PDF protect · unlock (AES-256 password) | ✅ | `qpdf` sidecar |
 | Audio convert (→ MP3, M4A, WAV) · trim · volume · speed | ✅ | `ffmpeg` sidecar |
 | Transcribe speech → text (local Whisper, optional NVIDIA GPU) | ✅ | `whisper.cpp` sidecar |
+| Link transcription (URL → timestamped Markdown) | ✅ | `yt-dlp` + `whisper.cpp` sidecars |
 | Video trim · merge · add-audio · rotate · mirror · speed · compress | ✅ | `ffmpeg` sidecar |
 | Media downloader (link → MP4 / MP3) | ✅ | `yt-dlp` + `ffmpeg` sidecars |
 | AVIF / JPEG-XL image output | ⬜ | `ravif` / `jpegxl-rs` |
@@ -77,7 +78,7 @@ Layering:
 | Image | `image` crate (+ `webp`/libwebp); AVIF/JXL planned |
 | PDF | `pdfium-render` (read) · `printpdf` (write) · `qpdf` (merge/encrypt/decrypt, sidecar) — **no MuPDF/Ghostscript** (AGPL) |
 | Media | native `ffmpeg` (sidecar) — convert + audio/video editing |
-| Transcription | `whisper.cpp` (`whisper-cli` sidecar) — local, optional NVIDIA CUDA GPU |
+| Transcription | `whisper.cpp` (`whisper-cli` sidecar) — local file/link transcripts, optional NVIDIA CUDA GPU |
 | Download | `yt-dlp` (sidecar) |
 | Package manager | pnpm (each of `app/`, `site/` is standalone) |
 | Lint / format | Biome |

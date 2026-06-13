@@ -28,6 +28,7 @@ desktop-only native — the web build and monorepo were removed (see
 | G | Release pipeline + auto-update (CI installer, signed updater, Pages) | ✅ Done |
 | H | Audio + video editing + compress (ffmpeg) | ✅ Done |
 | I | Transcription (Whisper, local, anti-hallucination + NVIDIA GPU) | ✅ Done (verified on Windows incl. GPU) |
+| J | Link transcription (yt-dlp -> Whisper -> timestamped Markdown) | ✅ Done |
 
 ---
 
@@ -76,6 +77,12 @@ desktop-only native — the web build and monorepo were removed (see
   progress. **Optional NVIDIA GPU** engine (`download_gpu_engine`, on-demand CUDA — **≈7–10×** on
   1–2 min clips; CPU fallback). Pure helpers cargo-tested; verified on Windows incl. GPU. Spec:
   [transcription](specs/transcription.md); rationale [ADR-010](specs/architecture.md).
+- ✅ **J — Link transcription**: paste a YouTube/media URL, download only the best audio with
+  `yt-dlp`, run the existing Whisper pipeline locally, and save an organized Markdown transcript
+  to Downloads. Uses two progress channels (download + transcription), the existing model gate,
+  and the optional GPU engine. Speaker labels were removed after real interview testing showed
+  local diarization was not reliable enough for the product bar. Spec:
+  [link transcription](specs/link-transcription.md).
 
 ---
 

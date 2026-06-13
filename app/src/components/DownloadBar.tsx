@@ -24,7 +24,9 @@ export function DownloadBar({
             ? "Starting…"
             : known
               ? `${pct}% · ${formatBytes(progress.downloaded)} / ${formatBytes(progress.total ?? 0)}`
-              : formatBytes(progress.downloaded)}
+              : progress.downloaded > 0
+                ? formatBytes(progress.downloaded)
+                : "Working..."}
         </span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-action-blue/20">

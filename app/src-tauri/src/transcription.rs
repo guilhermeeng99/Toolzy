@@ -42,10 +42,26 @@ struct ModelDef {
 /// Curated list — `large-v3` is the default (max fidelity); turbo is the faster,
 /// slightly-less-faithful option. tiny/base are omitted (too low-fidelity).
 const MODELS: &[ModelDef] = &[
-    ModelDef { id: "small", label: "Small", size_mb: 466 },
-    ModelDef { id: "medium", label: "Medium", size_mb: 1500 },
-    ModelDef { id: "large-v3-turbo", label: "Large v3 Turbo", size_mb: 1600 },
-    ModelDef { id: "large-v3", label: "Large v3 (max fidelity)", size_mb: 3100 },
+    ModelDef {
+        id: "small",
+        label: "Small",
+        size_mb: 466,
+    },
+    ModelDef {
+        id: "medium",
+        label: "Medium",
+        size_mb: 1500,
+    },
+    ModelDef {
+        id: "large-v3-turbo",
+        label: "Large v3 Turbo",
+        size_mb: 1600,
+    },
+    ModelDef {
+        id: "large-v3",
+        label: "Large v3 (max fidelity)",
+        size_mb: 3100,
+    },
 ];
 
 #[derive(Serialize)]
@@ -60,9 +76,9 @@ pub struct WhisperModel {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscribeResult {
-    text: String,        // transcript read back for the UI preview
-    output_path: String, // saved file beside the input
-    language: String,    // forced, or auto-detected from whisper output
+    pub text: String,        // transcript read back for the UI preview
+    pub output_path: String, // saved file beside the input
+    pub language: String,    // forced, or auto-detected from whisper output
 }
 
 /// Live recognition progress (0–100) streamed to the UI via a Channel, parsed from
@@ -70,14 +86,14 @@ pub struct TranscribeResult {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscribeProgress {
-    percent: f64,
+    pub percent: f64,
 }
 
 /// Holds the running whisper-cli child so `cancel_transcription` can kill it. Only
 /// one transcription runs at a time (the UI hides the button while busy).
 #[derive(Default)]
 pub struct TranscribeState {
-    child: Mutex<Option<CommandChild>>,
+    pub(crate) child: Mutex<Option<CommandChild>>,
 }
 
 /// Whether an NVIDIA GPU is present and whether the optional GPU engine is installed.
@@ -90,7 +106,10 @@ pub struct GpuStatus {
 
 /// `ggml-<id>.bin` for a known model id, else `None` (unknown id).
 fn model_filename(id: &str) -> Option<String> {
-    MODELS.iter().find(|m| m.id == id).map(|_| format!("ggml-{id}.bin"))
+    MODELS
+        .iter()
+        .find(|m| m.id == id)
+        .map(|_| format!("ggml-{id}.bin"))
 }
 
 /// HF resolve URL for a known model id, else `None`.
@@ -105,6 +124,7 @@ fn format_ext(format: &str) -> Option<&'static str> {
         "srt" => Some("srt"),
         "vtt" => Some("vtt"),
         "json" => Some("json"),
+        "jsonFull" => Some("json"),
         _ => None,
     }
 }
@@ -130,25 +150,37 @@ fn whisper_args(
     threads: usize,
 ) -> Vec<String> {
     let mut args = vec![
-        "-m".into(), model.to_string_lossy().into_owned(),
-        "-f".into(), wav.to_string_lossy().into_owned(),
-        "-l".into(), language.unwrap_or("auto").to_string(),
-        "-t".into(), threads.to_string(),                    // use all cores (default is 4)
+        "-m".into(),
+        model.to_string_lossy().into_owned(),
+        "-f".into(),
+        wav.to_string_lossy().into_owned(),
+        "-l".into(),
+        language.unwrap_or("auto").to_string(),
+        "-t".into(),
+        threads.to_string(), // use all cores (default is 4)
         // Anti-hallucination (fixed, not user-tunable):
-        "--vad".into(),                                       // gate silence with VAD
-        "--vad-model".into(), vad_model.to_string_lossy().into_owned(),
-        "--temperature".into(), "0".into(),                  // greedy, deterministic
-        "--no-fallback".into(),                              // no temperature ladder
-        "--max-context".into(), "0".into(),                  // no previous-text drift
-        "--print-progress".into(),                           // emit `progress = N%` for the UI bar
-        "-of".into(), out_base.to_string_lossy().into_owned(),
+        "--vad".into(), // gate silence with VAD
+        "--vad-model".into(),
+        vad_model.to_string_lossy().into_owned(),
+        "--temperature".into(),
+        "0".into(),             // greedy, deterministic
+        "--no-fallback".into(), // no temperature ladder
+        "--max-context".into(),
+        "0".into(),                // no previous-text drift
+        "--print-progress".into(), // emit `progress = N%` for the UI bar
+        "-of".into(),
+        out_base.to_string_lossy().into_owned(),
     ];
+    if format == "jsonFull" {
+        args.extend(["-ml".into(), "60".into(), "-sow".into()]);
+    }
     if task == "translate" {
         args.push("--translate".into());
     }
     args.push(match format {
         "srt" => "-osrt".into(),
         "vtt" => "-ovtt".into(),
+        "jsonFull" => "-ojf".into(),
         "json" => "-oj".into(),
         _ => "-otxt".into(),
     });
@@ -166,12 +198,21 @@ fn detected_language(stderr: &str) -> Option<String> {
 /// Pure → unit-tested. `None` for non-progress lines.
 fn parse_whisper_progress(line: &str) -> Option<f64> {
     let after = line.split("progress =").nth(1)?;
-    after.trim().trim_end_matches('%').trim().parse::<f64>().ok()
+    after
+        .trim()
+        .trim_end_matches('%')
+        .trim()
+        .parse::<f64>()
+        .ok()
 }
 
 /// App-data subdir holding the downloaded models + the VAD model.
 fn models_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("models"))
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models"))
 }
 
 /// Resolve a model to its on-disk path, erroring if unknown or not yet downloaded.
@@ -185,11 +226,24 @@ fn require_model(app: &AppHandle, model: &str) -> Result<PathBuf, String> {
     }
 }
 
+pub(crate) fn ensure_transcription_model_ready(app: &AppHandle, model: &str) -> Result<(), String> {
+    let _ = require_model(app, model)?;
+    let vad_path = models_dir(app)?.join(VAD_FILENAME);
+    if vad_path.exists() {
+        Ok(())
+    } else {
+        Err("model not downloaded: silero VAD".into())
+    }
+}
+
 /// The deterministic stem of the temp WAV name (the input's file stem, or "audio"
 /// when the path has none). Split out so it's unit-testable apart from the nanos
 /// suffix below. Pure → unit-tested.
 fn wav_stem(input: &Path) -> &str {
-    input.file_stem().and_then(|s| s.to_str()).unwrap_or("audio")
+    input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audio")
 }
 
 /// A unique temp WAV path for the 16 kHz mono intermediate.
@@ -208,9 +262,15 @@ async fn preprocess_to_wav(app: &AppHandle, input: &str, wav: &Path) -> Result<(
     run_ffmpeg(
         app,
         vec![
-            "-y".into(), "-i".into(), input.to_string(),
-            "-ar".into(), "16000".into(), "-ac".into(), "1".into(),
-            "-c:a".into(), "pcm_s16le".into(),
+            "-y".into(),
+            "-i".into(),
+            input.to_string(),
+            "-ar".into(),
+            "16000".into(),
+            "-ac".into(),
+            "1".into(),
+            "-c:a".into(),
+            "pcm_s16le".into(),
             wav.to_string_lossy().into_owned(),
         ],
     )
@@ -257,7 +317,9 @@ async fn run_whisper(
         .spawn()
         .map_err(|e| e.to_string())?;
     // so cancel_transcription can kill it
-    *child_slot.lock().map_err(|_| "transcription state lock poisoned".to_string())? = Some(child);
+    *child_slot
+        .lock()
+        .map_err(|_| "transcription state lock poisoned".to_string())? = Some(child);
 
     let mut log = String::new();
     let mut error_tail = String::new();
@@ -269,7 +331,11 @@ async fn run_whisper(
                 drain_whisper(&bytes, on_progress, &mut log, &mut error_tail);
             }
             CommandEvent::Terminated(payload) if payload.code != Some(0) => {
-                let reason = if error_tail.is_empty() { "unknown error" } else { &error_tail };
+                let reason = if error_tail.is_empty() {
+                    "unknown error"
+                } else {
+                    &error_tail
+                };
                 return Err(format!("transcription failed. {reason}"));
             }
             _ => {}
@@ -280,14 +346,16 @@ async fn run_whisper(
 
 /// Stream a URL to `dest` via a `.part` file renamed on completion (so an
 /// interrupted download leaves no half model). Blocking — call inside spawn_blocking.
-fn download_file(
+pub(crate) fn download_file(
     url: &str,
     dest: &Path,
     progress: Option<&Channel<DownloadProgress>>,
 ) -> Result<(), String> {
     // ureq 3: headers come from the `http` crate (case-insensitive keys), and the
     // body is read via `into_body().into_reader()` (the old `.into_reader()` is gone).
-    let resp = ureq::get(url).call().map_err(|e| format!("download failed: {e}"))?;
+    let resp = ureq::get(url)
+        .call()
+        .map_err(|e| format!("download failed: {e}"))?;
     let total: Option<u64> = resp
         .headers()
         .get("content-length")
@@ -312,7 +380,11 @@ fn download_file(
                 Some(t) if t > 0 => downloaded as f64 / t as f64 * 100.0,
                 _ => 0.0,
             };
-            let _ = ch.send(DownloadProgress { percent, downloaded, total });
+            let _ = ch.send(DownloadProgress {
+                percent,
+                downloaded,
+                total,
+            });
         }
     }
 
@@ -378,7 +450,11 @@ pub async fn download_whisper_model(
 
 /// Dir holding the downloaded GPU engine (whisper-cli.exe + CUDA DLLs).
 fn gpu_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("engine-cuda"))
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("engine-cuda"))
 }
 
 fn gpu_exe(app: &AppHandle) -> Result<PathBuf, String> {
@@ -390,7 +466,10 @@ fn nvidia_present() -> bool {
     #[cfg(windows)]
     {
         let root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
-        Path::new(&root).join("System32").join("nvcuda.dll").exists()
+        Path::new(&root)
+            .join("System32")
+            .join("nvcuda.dll")
+            .exists()
     }
     #[cfg(not(windows))]
     {
@@ -399,7 +478,7 @@ fn nvidia_present() -> bool {
 }
 
 /// Recursively find the first file named `name` under `dir`.
-fn find_file(dir: &Path, name: &str) -> Option<PathBuf> {
+pub(crate) fn find_file(dir: &Path, name: &str) -> Option<PathBuf> {
     for entry in std::fs::read_dir(dir).ok()?.flatten() {
         let p = entry.path();
         if p.is_dir() {
@@ -415,11 +494,16 @@ fn find_file(dir: &Path, name: &str) -> Option<PathBuf> {
 
 /// Extract `zip` into a fresh `tmp` dir. Uses the platform `tar` — on Windows that is
 /// bsdtar (ships with Windows 10+), which also unpacks `.zip`, so no extra crate.
-fn extract_zip(zip: &Path, tmp: &Path) -> Result<(), String> {
+pub(crate) fn extract_archive(archive: &Path, tmp: &Path) -> Result<(), String> {
     let _ = std::fs::remove_dir_all(tmp);
     std::fs::create_dir_all(tmp).map_err(|e| e.to_string())?;
     let ok = std::process::Command::new("tar")
-        .args(["-xf", &zip.to_string_lossy(), "-C", &tmp.to_string_lossy()])
+        .args([
+            "-xf",
+            &archive.to_string_lossy(),
+            "-C",
+            &tmp.to_string_lossy(),
+        ])
         .status()
         .map_err(|e| format!("extract failed: {e}"))?
         .success();
@@ -454,7 +538,7 @@ fn install_gpu_engine(dir: &Path, on_progress: &Channel<DownloadProgress>) -> Re
     download_file(GPU_URL, &zip, Some(on_progress))?;
 
     let tmp = dir.join("extract");
-    extract_zip(&zip, &tmp)?;
+    extract_archive(&zip, &tmp)?;
     copy_engine_files(&tmp, dir)?;
 
     let _ = std::fs::remove_dir_all(&tmp);
@@ -503,7 +587,9 @@ async fn recognize(
     } else {
         run_whisper(app, args, on_progress, child_slot).await
     };
-    *child_slot.lock().map_err(|_| "transcription state lock poisoned".to_string())? = None;
+    *child_slot
+        .lock()
+        .map_err(|_| "transcription state lock poisoned".to_string())? = None;
     recognized
 }
 
@@ -537,25 +623,29 @@ pub async fn download_gpu_engine(
 /// the forced language, else whisper's auto-detected code, else "auto".
 fn build_result(out: &Path, forced_language: Option<String>, stderr: &str) -> TranscribeResult {
     let text = std::fs::read_to_string(out).unwrap_or_default();
-    let language =
-        forced_language.unwrap_or_else(|| detected_language(stderr).unwrap_or_else(|| "auto".into()));
-    TranscribeResult { text, output_path: out.to_string_lossy().into_owned(), language }
+    let language = forced_language
+        .unwrap_or_else(|| detected_language(stderr).unwrap_or_else(|| "auto".into()));
+    TranscribeResult {
+        text,
+        output_path: out.to_string_lossy().into_owned(),
+        language,
+    }
 }
 
 /// Transcribe (or translate→English) a media file to text beside the input. Faithful
 /// by design — see the module docs. Needs the ffmpeg + whisper-cli sidecars and the
 /// chosen model already downloaded.
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
-pub async fn transcribe_audio(
+pub(crate) async fn transcribe_path_to_base(
     app: AppHandle,
     path: String,
+    out_base: PathBuf,
     model: String,
     language: Option<String>,
     task: Option<String>,
     format: Option<String>,
     on_progress: Channel<TranscribeProgress>,
-    state: State<'_, TranscribeState>,
+    child_slot: &Mutex<Option<CommandChild>>,
 ) -> Result<TranscribeResult, String> {
     let task = task.unwrap_or_else(|| "transcribe".into());
     let format = format.unwrap_or_else(|| "txt".into());
@@ -563,7 +653,9 @@ pub async fn transcribe_audio(
         return Err(format!("unknown task: {task}"));
     }
     let src = Path::new(&path);
-    let out = transcript_output_path(src, &format).ok_or_else(|| format!("unknown format: {format}"))?;
+    let out = format_ext(&format)
+        .map(|ext| out_base.with_extension(ext))
+        .ok_or_else(|| format!("unknown format: {format}"))?;
     let model_path = require_model(&app, &model)?;
     let vad_path = models_dir(&app)?.join(VAD_FILENAME);
     if !vad_path.exists() {
@@ -576,17 +668,56 @@ pub async fn transcribe_audio(
         return Err(e);
     }
 
-    let out_base = src.with_extension("");
     // Use all available cores — the large-v3 encoder is CPU-bound and whisper-cli
     // otherwise defaults to only 4 threads.
-    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
     let args = whisper_args(
-        &wav, &model_path, &vad_path, &out_base, language.as_deref(), &task, &format, threads,
+        &wav,
+        &model_path,
+        &vad_path,
+        &out_base,
+        language.as_deref(),
+        &task,
+        &format,
+        threads,
     );
-    let recognized = recognize(&app, args, &on_progress, &state.child).await;
+    let recognized = recognize(&app, args, &on_progress, child_slot).await;
     let _ = std::fs::remove_file(&wav); // always clean up the temp WAV (success or error)
     let stderr = recognized?;
     Ok(build_result(&out, language, &stderr))
+}
+
+/// Transcribe (or translate->English) a media file to text beside the input.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn transcribe_audio(
+    app: AppHandle,
+    path: String,
+    model: String,
+    language: Option<String>,
+    task: Option<String>,
+    format: Option<String>,
+    on_progress: Channel<TranscribeProgress>,
+    state: State<'_, TranscribeState>,
+) -> Result<TranscribeResult, String> {
+    let selected_format = format.as_deref().unwrap_or("txt");
+    let out_base = transcript_output_path(Path::new(&path), selected_format)
+        .map(|p| p.with_extension(""))
+        .unwrap_or_else(|| Path::new(&path).with_extension(""));
+    transcribe_path_to_base(
+        app,
+        path,
+        out_base,
+        model,
+        language,
+        task,
+        format,
+        on_progress,
+        &state.child,
+    )
+    .await
 }
 
 /// Kill the in-flight transcription, if any (the UI Cancel button). No-op when idle.
@@ -634,9 +765,18 @@ mod tests {
 
     #[test]
     fn transcript_output_path_swaps_extension_per_format() {
-        assert_eq!(transcript_output_path(Path::new("/a/clip.mp3"), "srt").unwrap(), PathBuf::from("/a/clip.srt"));
-        assert_eq!(transcript_output_path(Path::new("/a/clip.mp3"), "txt").unwrap(), PathBuf::from("/a/clip.txt"));
-        assert_eq!(transcript_output_path(Path::new("/a/clip.mp3"), "json").unwrap(), PathBuf::from("/a/clip.json"));
+        assert_eq!(
+            transcript_output_path(Path::new("/a/clip.mp3"), "srt").unwrap(),
+            PathBuf::from("/a/clip.srt")
+        );
+        assert_eq!(
+            transcript_output_path(Path::new("/a/clip.mp3"), "txt").unwrap(),
+            PathBuf::from("/a/clip.txt")
+        );
+        assert_eq!(
+            transcript_output_path(Path::new("/a/clip.mp3"), "json").unwrap(),
+            PathBuf::from("/a/clip.json")
+        );
     }
 
     #[test]
@@ -647,10 +787,23 @@ mod tests {
     #[test]
     fn whisper_args_always_emits_antihallucination_flags() {
         let a = whisper_args(
-            Path::new("a.wav"), Path::new("m.bin"), Path::new("v.bin"),
-            Path::new("out"), None, "transcribe", "txt", 8,
+            Path::new("a.wav"),
+            Path::new("m.bin"),
+            Path::new("v.bin"),
+            Path::new("out"),
+            None,
+            "transcribe",
+            "txt",
+            8,
         );
-        for flag in ["--vad", "--vad-model", "--temperature", "--no-fallback", "--max-context", "-otxt"] {
+        for flag in [
+            "--vad",
+            "--vad-model",
+            "--temperature",
+            "--no-fallback",
+            "--max-context",
+            "-otxt",
+        ] {
             assert!(a.contains(&flag.to_string()), "missing {flag}");
         }
         assert!(a.windows(2).any(|w| w[0] == "--temperature" && w[1] == "0"));
@@ -663,8 +816,14 @@ mod tests {
     #[test]
     fn whisper_args_translate_forced_lang_and_format() {
         let a = whisper_args(
-            Path::new("a.wav"), Path::new("m.bin"), Path::new("v.bin"),
-            Path::new("out"), Some("pt"), "translate", "srt", 8,
+            Path::new("a.wav"),
+            Path::new("m.bin"),
+            Path::new("v.bin"),
+            Path::new("out"),
+            Some("pt"),
+            "translate",
+            "srt",
+            8,
         );
         assert!(a.contains(&"--translate".to_string()));
         assert!(a.contains(&"-osrt".to_string()));
@@ -675,10 +834,19 @@ mod tests {
     fn whisper_args_format_flags_match_whisper_cli() {
         // whisper-cli v1.8.4 spellings: -otxt/-ovtt/-osrt, and JSON is -oj (not -ojson).
         let flag = |fmt| {
-            whisper_args(Path::new("a.wav"), Path::new("m"), Path::new("v"), Path::new("o"), None, "transcribe", fmt, 8)
-                .into_iter()
-                .find(|a| a.starts_with("-o") && a.as_str() != "-of")
-                .unwrap()
+            whisper_args(
+                Path::new("a.wav"),
+                Path::new("m"),
+                Path::new("v"),
+                Path::new("o"),
+                None,
+                "transcribe",
+                fmt,
+                8,
+            )
+            .into_iter()
+            .find(|a| a.starts_with("-o") && a.as_str() != "-of")
+            .unwrap()
         };
         assert_eq!(flag("vtt"), "-ovtt");
         assert_eq!(flag("json"), "-oj");
@@ -699,7 +867,10 @@ mod tests {
             parse_whisper_progress("whisper_print_progress_callback: progress =  40%"),
             Some(40.0)
         );
-        assert_eq!(parse_whisper_progress("[00:00:00.000 --> 00:00:02.000] hi"), None);
+        assert_eq!(
+            parse_whisper_progress("[00:00:00.000 --> 00:00:02.000] hi"),
+            None
+        );
     }
 
     #[test]
