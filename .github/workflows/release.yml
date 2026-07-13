@@ -137,6 +137,7 @@ jobs:
           jq --arg v "$next" '.version = $v' app/src-tauri/tauri.conf.json > "$tmp"
           mv "$tmp" app/src-tauri/tauri.conf.json
           sed -i -E "0,/^version = \".*\"$/ s//version = \"$next\"/" app/src-tauri/Cargo.toml
+          cargo update --manifest-path app/src-tauri/Cargo.toml --package toolzy --precise "$next"
           # Keep the app manifest in lockstep (cosmetic, but avoids version drift).
           tmp=$(mktemp)
           jq --arg v "$next" '.version = $v' app/package.json > "$tmp"
@@ -148,7 +149,7 @@ jobs:
         run: |
           set -euo pipefail
           next="${{ steps.bump.outputs.next }}"
-          git add app/src-tauri/tauri.conf.json app/src-tauri/Cargo.toml app/src-tauri/ytdlp-version.txt app/package.json
+          git add app/src-tauri/tauri.conf.json app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/ytdlp-version.txt app/package.json
           git commit -m "chore(release): v${next} [skip ci]"
           git tag "v${next}"
           git push origin main
