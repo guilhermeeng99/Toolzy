@@ -9,6 +9,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Existing version to rebuild and publish without another bump (for example 0.1.16)"
+        required: false
+        type: string
   schedule:
     # Check weekly for a new yt-dlp extractor release. A build is published only
     # when its upstream version differs from app/src-tauri/ytdlp-version.txt.
@@ -130,6 +135,16 @@ jobs:
         run: |
           set -euo pipefail
           current=$(jq -r .version app/src-tauri/tauri.conf.json)
+          manual='${{ inputs.release_version }}'
+          if [[ -n "$manual" ]]; then
+            if [[ ! "$manual" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$manual" != "$current" ]]; then
+              echo "release_version must match the current app version ($current)" >&2
+              exit 1
+            fi
+            echo "next=$manual" >> "$GITHUB_OUTPUT"
+            echo "reusing existing v$manual"
+            exit 0
+          fi
           IFS=. read -r major minor patch <<< "$current"
           next="${major}.${minor}.$((patch + 1))"
           echo "next=$next" >> "$GITHUB_OUTPUT"
@@ -145,6 +160,7 @@ jobs:
           echo "bumped $current -> $next"
 
       - name: Commit, tag, push
+        if: inputs.release_version == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -198,3 +214,11 @@ jobs:
             > "Unrecognized app". Click **More info → Run anyway**.
           releaseDraft: false
           prerelease: false
+
+      - name: Preserve installers after publish failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolzy-${{ steps.bump.outputs.next }}-bundles
+          path: app/src-tauri/target/release/bundle/**
+          if-no-files-found: ignore
