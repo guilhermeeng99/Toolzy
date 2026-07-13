@@ -44,6 +44,7 @@ pub fn run() {
             video_edit::mirror_video,
             video_edit::change_video_speed,
             video_edit::compress_video,
+            download::expand_media_urls,
             download::probe_media,
             download::download_media,
             link_transcription::transcribe_link,

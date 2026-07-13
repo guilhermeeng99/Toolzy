@@ -7,7 +7,7 @@
 // Extraction uses `tar` (bsdtar ships with Windows 10+/macOS/Linux and reads zip/tgz/txz).
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, copyFile, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,12 +15,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const srcTauri = join(here, "..", "src-tauri");
 const binDir = join(srcTauri, "binaries");
 const pdfiumDir = join(srcTauri, "pdfium");
+const YTDLP_VERSION = (await readFile(join(srcTauri, "ytdlp-version.txt"), "utf8")).trim();
 
 const TARGETS = {
   "win32-x64": {
     triple: "x86_64-pc-windows-msvc",
     exe: ".exe",
-    ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+    ytdlp: `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp.exe`,
     ffmpeg: {
       url: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
       member: "ffmpeg.exe",
@@ -45,7 +46,7 @@ const TARGETS = {
   "linux-x64": {
     triple: "x86_64-unknown-linux-gnu",
     exe: "",
-    ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
+    ytdlp: `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp`,
     ffmpeg: {
       url: "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
       member: "ffmpeg",
@@ -58,7 +59,7 @@ const TARGETS = {
   "darwin-arm64": {
     triple: "aarch64-apple-darwin",
     exe: "",
-    ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+    ytdlp: `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_macos`,
     ffmpeg: { url: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip", member: "ffmpeg" },
     pdfium: {
       url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz",
@@ -68,7 +69,7 @@ const TARGETS = {
   "darwin-x64": {
     triple: "x86_64-apple-darwin",
     exe: "",
-    ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+    ytdlp: `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_macos`,
     ffmpeg: { url: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip", member: "ffmpeg" },
     pdfium: {
       url: "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-x64.tgz",
@@ -148,6 +149,10 @@ async function fetchFromArchive({ url, member }, dest) {
 const ytdlpDest = join(binDir, `yt-dlp-${t.triple}${t.exe}`);
 await download(t.ytdlp, ytdlpDest);
 if (!t.exe) await chmod(ytdlpDest, 0o755);
+const fetchedYtdlpVersion = execFileSync(ytdlpDest, ["--version"], { encoding: "utf8" }).trim();
+if (fetchedYtdlpVersion !== YTDLP_VERSION) {
+  throw new Error(`yt-dlp version mismatch: expected ${YTDLP_VERSION}, got ${fetchedYtdlpVersion}`);
+}
 console.log(`✓ ${ytdlpDest}`);
 
 // ffmpeg (from archive) -> sidecar

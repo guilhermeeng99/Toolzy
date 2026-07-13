@@ -72,6 +72,7 @@ fn build_audio_download_args(
     url: String,
 ) -> Vec<String> {
     let mut args = vec![
+        "--ignore-config".into(),
         "--no-playlist".into(),
         "--windows-filenames".into(),
         "--trim-filenames".into(),
@@ -421,6 +422,7 @@ mod tests {
             .windows(2)
             .any(|w| w[0] == "-f" && w[1] == "ba/bestaudio/best"));
         assert!(args.contains(&"--windows-filenames".to_string()));
+        assert!(args.contains(&"--ignore-config".to_string()));
         assert!(args.contains(&"--ffmpeg-location".to_string()));
         assert!(args.iter().any(|s| s.contains("download:PROG|")));
     }

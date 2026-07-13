@@ -5,7 +5,7 @@ Rust is the engine (conversion runs natively); the React UI is a thin webview fr
 
 Tools: **Image** (convert/resize, batch, drag-drop), **PDF** (pages↔images, merge, compress,
 protect/unlock), **Audio** (convert MP3/M4A/WAV, trim, volume, speed), **Video** (trim, merge,
-add audio, rotate, mirror, speed), **Download** (link→MP4/MP3 via yt-dlp).
+add audio, rotate, mirror, speed), **Download** (1,000+ yt-dlp sites, batches/playlists→MP4/MP3).
 
 ## Layout
 

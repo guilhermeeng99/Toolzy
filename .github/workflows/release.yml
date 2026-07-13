@@ -1,14 +1,18 @@
 name: Release
 
-# On every push to main: run CI (Biome + app/site build + cargo test) and ONLY if
-# it passes, bump the patch version, tag, build the Windows installer (binaries
-# bundled), and publish a GitHub Release. PRs run CI only. The release job skips
-# the bot's own bump commit (`chore(release):`).
+# Pushes to main run CI and publish a release only after it passes. PRs run CI
+# only. A weekly schedule publishes the same signed app update only when yt-dlp
+# has a newer tracked release. The release job skips its own bump commit.
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Check weekly for a new yt-dlp extractor release. A build is published only
+    # when its upstream version differs from app/src-tauri/ytdlp-version.txt.
+    - cron: "17 9 * * 1"
 
 permissions:
   contents: write
@@ -65,11 +69,45 @@ jobs:
       - name: Cargo test (Rust engine)
         run: cargo test --manifest-path app/src-tauri/Cargo.toml
 
+  freshness:
+    name: yt-dlp freshness
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    outputs:
+      latest: ${{ steps.check.outputs.latest }}
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        name: Compare tracked and latest yt-dlp
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          latest=$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest | jq -r .tag_name)
+          tracked=$(tr -d '\r\n' < app/src-tauri/ytdlp-version.txt)
+          proceed=true
+          if [[ "$EVENT_NAME" == "schedule" && "$latest" == "$tracked" ]]; then
+            proceed=false
+          fi
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "proceed=$proceed" >> "$GITHUB_OUTPUT"
+          echo "tracked=$tracked latest=$latest proceed=$proceed"
+
   release:
     name: bump · build · publish
     runs-on: windows-latest
-    needs: [ci]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore(release):')
+    needs: [ci, freshness]
+    if: >-
+      needs.freshness.outputs.proceed == 'true' &&
+      (github.event_name != 'push' ||
+      (github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore(release):')))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -81,6 +119,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Record bundled yt-dlp version
+        shell: bash
+        run: printf '%s\n' '${{ needs.freshness.outputs.latest }}' > app/src-tauri/ytdlp-version.txt
 
       - name: Bump patch version
         id: bump
@@ -106,7 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           next="${{ steps.bump.outputs.next }}"
-          git add app/src-tauri/tauri.conf.json app/src-tauri/Cargo.toml app/package.json
+          git add app/src-tauri/tauri.conf.json app/src-tauri/Cargo.toml app/src-tauri/ytdlp-version.txt app/package.json
           git commit -m "chore(release): v${next} [skip ci]"
           git tag "v${next}"
           git push origin main
@@ -145,6 +187,8 @@ jobs:
           releaseName: 'Toolzy v${{ steps.bump.outputs.next }}'
           releaseBody: |
             Auto-released from `main` @ ${{ github.sha }}.
+
+            Bundled yt-dlp: `${{ needs.freshness.outputs.latest }}`.
 
             Download the installer (`.exe` NSIS or `.msi`) for Windows and run it. ffmpeg,
             yt-dlp and pdfium are bundled — nothing else to download.

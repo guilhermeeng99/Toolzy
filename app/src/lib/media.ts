@@ -32,10 +32,19 @@ export function probeDuration(path: string): Promise<number> {
 }
 
 export type DownloadFormat = "mp4" | "mp3";
+export type CookieBrowser = "brave" | "chrome" | "edge" | "firefox" | "";
+
+export const COOKIE_BROWSERS: readonly { value: CookieBrowser; label: string }[] = [
+  { value: "", label: "Do not use browser cookies" },
+  { value: "chrome", label: "Google Chrome" },
+  { value: "edge", label: "Microsoft Edge" },
+  { value: "firefox", label: "Mozilla Firefox" },
+  { value: "brave", label: "Brave" },
+];
 
 /** One downloadable MP4 quality; `filesize` is the merged video+audio byte estimate. */
 export interface VideoOption {
-  height: number;
+  height: number | null;
   label: string;
   ext: string;
   filesize: number | null;
@@ -46,12 +55,25 @@ export interface MediaProbe {
   title: string;
   thumbnail: string | null;
   duration: number | null;
+  source: string;
+  hasAudio: boolean;
   video: VideoOption[];
 }
 
-/** Inspect a link without downloading: title/thumbnail/duration + MP4 qualities. */
-export function probeMedia(url: string): Promise<MediaProbe> {
-  return invoke<MediaProbe>("probe_media", { url });
+/** Expand one media/playlist URL to at most 100 canonical media URLs. */
+export function expandMediaUrls(url: string, cookieBrowser: CookieBrowser): Promise<string[]> {
+  return invoke<string[]>("expand_media_urls", {
+    url,
+    cookieBrowser: cookieBrowser || undefined,
+  });
+}
+
+/** Inspect one link without downloading: source metadata + MP4 qualities. */
+export function probeMedia(url: string, cookieBrowser: CookieBrowser): Promise<MediaProbe> {
+  return invoke<MediaProbe>("probe_media", {
+    url,
+    cookieBrowser: cookieBrowser || undefined,
+  });
 }
 
 /** MP3 bitrates offered in the Audio tab (ffmpeg transcode targets, kbps). */
@@ -78,7 +100,7 @@ export interface DownloadProgress {
 export function downloadMedia(
   url: string,
   format: DownloadFormat,
-  opts?: { height?: number; audioBitrate?: number },
+  opts?: { height?: number; audioBitrate?: number; cookieBrowser?: CookieBrowser },
   onProgress?: (p: DownloadProgress) => void,
 ): Promise<string> {
   const channel = new Channel<DownloadProgress>();
@@ -88,6 +110,7 @@ export function downloadMedia(
     format,
     height: opts?.height,
     audioBitrate: opts?.audioBitrate,
+    cookieBrowser: opts?.cookieBrowser || undefined,
     onProgress: channel,
   });
 }

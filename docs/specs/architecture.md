@@ -68,15 +68,18 @@ browser sandbox, no upload, no server.
 ### ADR-003: The downloader runs on the user's machine
 **Status:** Accepted · 2026-05-21
 
-**Context.** Downloading from sites like YouTube needs `yt-dlp`, and hosting it server-side is
-unviable (datacenter-IP blocking, ToS/legal risk).
+**Context.** Downloading from 1,000+ supported sites needs `yt-dlp`, and hosting it server-side is
+unviable (datacenter-IP blocking, operating cost, and additional ToS/legal risk).
 
 **Decision.** Run `yt-dlp` (+ `ffmpeg`) as **sidecars on the user's own machine and
 residential IP**. Toolzy hosts nothing for it.
 
 **Consequences.**
-- ✅ No server, no proxy cost, no IP-block problem; legal exposure stays with the end user.
-- ⚠️ `yt-dlp` breaks often → ship it as an updatable sidecar (`scripts/fetch-binaries.mjs`).
+- ✅ No server or proxy cost; requests use the user's own connection. Users remain responsible for
+  download rights, site terms, and local law.
+- ⚠️ Extractors break often. Track an explicit yt-dlp release, fetch that exact binary for
+  reproducible builds, and check weekly for upstream releases. Updates ship through Toolzy's signed
+  updater instead of mutating an installed executable in place.
 
 ### ADR-004: Distribution
 **Status:** Accepted · 2026-05-21

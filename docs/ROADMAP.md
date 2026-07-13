@@ -44,12 +44,13 @@ desktop-only native — the web build and monorepo were removed (see
   **protect/unlock** (`add_pdf_password` / `remove_pdf_password`) via the **qpdf** sidecar
   (Apache-2.0; arg builders cargo-tested). Six-mode PDF UI with drag-to-reorder lists; shared
   `ui.tsx`. Needs pdfium beside the exe + the qpdf sidecar. See [ADR-009](specs/architecture.md#adr-009-qpdf-sidecar-for-pdf-merge--encryption).
-- ✅ **D — Media + downloader**: `convert_media` (ffmpeg sidecar: mp3/m4a/wav, batch) and
-  `download_media` (yt-dlp sidecar, `--ffmpeg-location`, prints final path; arg builder
-  cargo-tested). tauri-plugin-shell + `externalBin` + shell capability;
-  `scripts/fetch-binaries.mjs`. **Quality picker**: `probe_media` lists available MP4
-  resolutions (with merged size) + MP3 bitrate tiers before download (`--dump-single-json`,
-  parser cargo-tested).
+- ✅ **D — Media + multi-site downloader**: `convert_media` (ffmpeg sidecar: mp3/m4a/wav,
+  batch) plus a yt-dlp downloader for 1,000+ supported sites. Multiple URLs and playlists expand
+  to a deduplicated, sequential queue; every item has MP4/MP3 quality selection, live progress,
+  retry, actionable extractor errors, audio-only/generic fallbacks, and optional explicit browser
+  cookies. MP4 prefers H.264/AAC and remuxes/recodes when needed. Pure URL/cookie/error/probe/arg/
+  progress helpers are cargo-tested. Weekly CI checks upstream yt-dlp and ships a normal signed
+  Toolzy update only when its tracked version changes. Spec: [media download](specs/media-download.md).
 - ✅ **E — Cutover + docs**: removed `apps/web`, old `apps/desktop`, `packages/*`, Turborepo,
   pnpm workspace, root vitest. Rewrote README, CLAUDE.md, all `docs/specs/*` (ADRs
   desktop-first) and this roadmap. CI = Biome + app/site builds.

@@ -2,7 +2,7 @@
 
 A free, open-source, **native desktop** toolbox for everyday file tasks: convert images,
 work with PDFs (images ↔ PDF, merge, compress, password), convert your own audio/video, and
-download audio/video from a link — all on your own machine.
+download MP4/MP3 from 1,000+ yt-dlp-supported sites — all on your own machine.
 
 **The promise:** your files never leave your device. Conversion runs **natively** (Rust +
 bundled binaries), not in a browser sandbox — fast, reliable, no upload, no account, no server.
@@ -24,7 +24,7 @@ Status: ✅ done · 🚧 in progress · ⬜ planned. See [`docs/ROADMAP.md`](doc
 | Transcribe speech → text (local Whisper, optional NVIDIA GPU) | ✅ | `whisper.cpp` sidecar |
 | Link transcription (URL → timestamped Markdown) | ✅ | `yt-dlp` + `whisper.cpp` sidecars |
 | Video trim · merge · add-audio · rotate · mirror · speed · compress | ✅ | `ffmpeg` sidecar |
-| Media downloader (link → MP4 / MP3) | ✅ | `yt-dlp` + `ffmpeg` sidecars |
+| Multi-site downloader (batch/playlists → MP4/MP3, optional browser cookies) | ✅ | `yt-dlp` + `ffmpeg` sidecars |
 | AVIF / JPEG-XL image output | ⬜ | `ravif` / `jpegxl-rs` |
 
 ## Download
@@ -38,6 +38,8 @@ Grab the latest **Windows** installer from [GitHub Releases](https://github.com/
 - No analytics that read file contents. No accounts. No tracking.
 - The downloader talks directly from your machine to the source — never through a Toolzy
   server (there isn't one).
+- Multiple links and playlists are expanded, deduplicated, and downloaded sequentially. Sites
+  requiring login can use cookies from a browser only after explicit selection in the UI.
 
 ## Architecture
 
@@ -79,7 +81,7 @@ Layering:
 | PDF | `pdfium-render` (read) · `printpdf` (write) · `qpdf` (merge/encrypt/decrypt, sidecar) — **no MuPDF/Ghostscript** (AGPL) |
 | Media | native `ffmpeg` (sidecar) — convert + audio/video editing |
 | Transcription | `whisper.cpp` (`whisper-cli` sidecar) — local file/link transcripts, optional NVIDIA CUDA GPU |
-| Download | `yt-dlp` (sidecar) |
+| Download | `yt-dlp` (sidecar) — 1,000+ extractors, batch/playlists, MP4/MP3 |
 | Package manager | pnpm (each of `app/`, `site/` is standalone) |
 | Lint / format | Biome |
 | CI | GitHub Actions (Biome + `cargo test` + app/site builds; gated release → signed Windows installer + Pages) |

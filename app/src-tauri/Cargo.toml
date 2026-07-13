@@ -40,3 +40,5 @@ base64 = "0.22"
 # (no async stack), called off the runtime via spawn_blocking. v3 is built on the
 # `http` crate (rustls TLS by default).
 ureq = "3"
+# Strict HTTP(S) URL parsing for downloader inputs and playlist expansion.
+url = "2"

@@ -37,8 +37,9 @@ const TOOL_META: Record<Tool, { title: string; description: string }> = {
     description: "Trim, merge, rotate, mirror, add audio, or change speed — all native ffmpeg.",
   },
   download: {
-    title: "Media downloader",
-    description: "Save audio and video from a link as MP4 or MP3, on your own connection.",
+    title: "Multi-site media downloader",
+    description:
+      "Save MP4 or MP3 from 1,000+ yt-dlp-supported sites, including playlists and batches.",
   },
 };
 

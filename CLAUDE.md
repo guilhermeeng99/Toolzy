@@ -27,7 +27,8 @@ natively); the **React + TypeScript (Vite)** UI is a thin webview front-end. See
 ```
 app/
   src/                # React + TS UI (Vite). Presentation only.
-    components/        #   tools (ImageTool, PdfTool, MediaTool, VideoTool, DownloadTool)
+    components/        #   tools (ImageTool, PdfTool, MediaTool, VideoTool, DownloadTool,
+                       #     MediaDownloadPanel)
                        #     + pdf/ media/ video/ submodes + shared components
                        #     (BatchPanel, DownloadBar, EditPanel, TimeRange, TranscribeTool, ui.tsx)
     lib/               #   typed invoke() wrappers (one per command group) + shared
@@ -209,7 +210,8 @@ Edge cases, Testing checklist, Out of scope. Keep spec and code in sync.
 
 - No telemetry that inspects file contents. No uploads. No Toolzy server in any path.
 - The downloader connects directly from the user's machine to the source.
-- Validate inputs (e.g. http(s) URL) before spawning a sidecar; surface a clear `Err`.
+- Downloader URLs use strict HTTP(S) parsing; yt-dlp always gets `--ignore-config`. Browser cookies
+  require an explicit allow-listed UI choice and are never persisted by Toolzy.
 
 ---
 
