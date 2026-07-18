@@ -71,8 +71,15 @@ fn cookie_args(browser: Option<&str>) -> Result<Vec<String>, String> {
     Ok(vec!["--cookies-from-browser".into(), browser])
 }
 
-fn base_ytdlp_args(cookie_browser: Option<&str>) -> Result<Vec<String>, String> {
-    let mut args = vec!["--ignore-config".into()];
+/// Flags every yt-dlp invocation needs.
+///
+/// `--encoding utf-8` is not cosmetic: on Windows yt-dlp writes `--print` output and
+/// JSON dumps in the console codepage (cp1252 on a pt-BR machine), which is not valid
+/// UTF-8. `String::from_utf8_lossy` then turns an accented title into U+FFFD, so the
+/// reported file path no longer resolves and the next step (ffmpeg) fails on a file
+/// that does not exist. Forcing utf-8 keeps every printed path and title round-trippable.
+pub(crate) fn base_ytdlp_args(cookie_browser: Option<&str>) -> Result<Vec<String>, String> {
+    let mut args = vec!["--ignore-config".into(), "--encoding".into(), "utf-8".into()];
     args.extend(cookie_args(cookie_browser)?);
     Ok(args)
 }
@@ -453,6 +460,10 @@ fn drain_progress(bytes: &[u8], on_progress: &Channel<DownloadProgress>) -> Opti
             Some(progress) => {
                 let _ = on_progress.send(progress);
             }
+            // yt-dlp renders an unknown byte count as the literal "NA", so a PROG| line
+            // can fail to parse and still be progress — never a path. Promoting it would
+            // hand the caller `PROG|NA|NA|NA` as the saved file.
+            None if trimmed.starts_with(PROGRESS_PREFIX) => {}
             None => text = Some(trimmed.to_string()),
         }
     }
@@ -558,6 +569,17 @@ mod tests {
     }
 
     #[test]
+    fn every_call_forces_utf8_output() {
+        // Regression: yt-dlp otherwise prints paths/titles in the Windows console
+        // codepage, which from_utf8_lossy corrupts into U+FFFD.
+        let base = base_ytdlp_args(None).unwrap();
+        assert!(base.windows(2).any(|pair| pair == ["--encoding", "utf-8"]));
+        assert!(args("mp3", None, None)
+            .windows(2)
+            .any(|pair| pair == ["--encoding", "utf-8"]));
+    }
+
+    #[test]
     fn cookie_browser_is_allow_listed() {
         assert_eq!(
             cookie_args(Some("Edge")).unwrap(),
@@ -647,6 +669,8 @@ mod tests {
         assert_eq!(estimate.percent, 25.0);
         assert_eq!(parse_progress("PROG|250|NA|NA").unwrap().total, None);
         assert!(parse_progress("ERROR: unavailable").is_none());
+        // yt-dlp can render the downloaded count itself as "NA" before the first chunk.
+        assert!(parse_progress("PROG|NA|NA|NA").is_none());
     }
 
     #[test]

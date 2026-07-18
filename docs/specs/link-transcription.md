@@ -1,7 +1,7 @@
 # Link Transcription Feature Spec
 
 > **Status**: Implemented (local YouTube/link -> organized Markdown transcript)
-> **Last updated**: 2026-06-13
+> **Last updated**: 2026-07-18
 > **Environment**: desktop (native)
 
 Paste a YouTube/media URL, download only the best available audio with the existing `yt-dlp`
@@ -79,6 +79,21 @@ Flow:
 7. Speaker labels, speaker counting, and speaker names are not shown or inferred.
 8. Temporary audio is removed after the command completes; a failed download may leave no final
    transcript.
+9. Every `yt-dlp` invocation passes `--encoding utf-8`. On Windows yt-dlp otherwise writes its
+   `--print` output in the console codepage (cp1252), which is not valid UTF-8, so an accented
+   title (`Reunião orientação`) reaches Rust as U+FFFD and the reported audio path no longer
+   resolves — ffmpeg then fails on a file that does not exist.
+10. The audio path reported by yt-dlp is used only when it resolves to an existing file. Otherwise
+    the per-run temp dir is scanned for its single file, so a corrupted or missing path line never
+    reaches ffmpeg as a non-existent input.
+11. Whisper tokens are **subwords**, and the word boundary is encoded as a leading space
+    (`" ent"` + `"rando"` is one word). Each segment carries `starts_word`, read before the text
+    is trimmed; a continuation is concatenated with no separator and never starts a new block.
+    Joining every token with a space instead shredded real words into `Obrig ado` / `out ub ro`.
+12. A token whose `offsets.from == offsets.to` is kept, not dropped. Zero duration means Whisper
+    could not resolve the timing, not that the token is junk — discarding those silently deleted
+    real words and punctuation from the transcript (the `Gu` of `Guilherme`, `" aí"`, `","`).
+    Bracketed special tokens (`[_BEG_]`, `[_TT_n]`) are still filtered out by text, not by timing.
 
 ## 4. UI
 
@@ -104,14 +119,20 @@ blocks.
 
 - **Rust** (`cargo test`):
   - [ ] `build_audio_download_args` requests best audio, safe filenames, progress, and final path.
+  - [ ] `build_audio_download_args` forces `--encoding utf-8` (accented titles stay round-trippable).
+  - [ ] `only_file_in` resolves the temp dir's single file and stays `None` when ambiguous.
   - [ ] `parse_segments` reads Whisper JSON offsets/text.
   - [ ] `parse_segments` prefers Whisper tokens when available.
+  - [ ] Subword tokens rejoin into whole words (`" ent"` + `"rando"` → `entrando`).
+  - [ ] A continuation token never starts a block, even across a long pause.
+  - [ ] Zero-duration tokens keep their text; bracketed special tokens are still dropped.
   - [ ] `group_segments` splits on long pauses.
   - [ ] `render_markdown` includes title, source, language, and timestamp blocks.
   - [ ] `render_markdown` never includes speaker labels.
   - [ ] `timestamp` renders `MM:SS` and `HH:MM:SS`.
 - **Manual / runtime**:
   - [ ] Paste a YouTube URL, use an installed model, and confirm a `.md` is saved to Downloads.
+  - [ ] Use a URL whose title has accents/non-ASCII characters and confirm it transcribes.
   - [ ] Confirm the UI does not ask for speaker count, speaker labels, or any extra model/token.
   - [ ] Confirm the saved Markdown has timestamped blocks and no speaker headers.
   - [ ] Interrupt / fail a URL and confirm the UI surfaces the yt-dlp error.

@@ -7,6 +7,20 @@ use std::path::{Path, PathBuf};
 
 use tauri_plugin_shell::ShellExt;
 
+/// The last stderr line that actually says something.
+///
+/// `.lines().last()` is wrong here: Tauri's `Command::output()` appends its own newline
+/// after every captured chunk, so ffmpeg's stderr always ends in a blank line and the
+/// naive tail rendered a bare `"ffmpeg failed."` with no reason. Pure → unit-tested.
+fn last_error_line(stderr: &str) -> &str {
+    stderr
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("unknown error")
+}
+
 /// Run the bundled ffmpeg sidecar with `args`, mapping a non-zero exit to the
 /// stderr tail. Shared by every native media command so the failure message has
 /// one shape. Needs the `ffmpeg` sidecar.
@@ -24,10 +38,7 @@ pub async fn run_ffmpeg(app: &tauri::AppHandle, args: Vec<String>) -> Result<(),
         return Ok(());
     }
     let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(format!(
-        "ffmpeg failed. {}",
-        stderr.lines().last().unwrap_or("unknown error")
-    ))
+    Err(format!("ffmpeg failed. {}", last_error_line(&stderr)))
 }
 
 /// Output path beside the input: `clip.mp4` + `"trimmed"` → `clip-trimmed.mp4`.
@@ -136,6 +147,23 @@ mod tests {
     #[test]
     fn parse_duration_reads_full_hours() {
         assert_eq!(parse_duration("Duration: 01:00:00.00,"), Some(3600.0));
+    }
+
+    #[test]
+    fn last_error_line_skips_the_trailing_blank() {
+        // Regression: Tauri's Command::output() appends a newline per captured chunk, so
+        // ffmpeg's stderr ends blank and `.lines().last()` rendered a bare "ffmpeg failed.".
+        let stderr = "  libswresample   6.  3.102\nError opening input files: No such file or directory\r\n\n";
+        assert_eq!(
+            last_error_line(stderr),
+            "Error opening input files: No such file or directory"
+        );
+    }
+
+    #[test]
+    fn last_error_line_falls_back_when_nothing_was_written() {
+        assert_eq!(last_error_line(""), "unknown error");
+        assert_eq!(last_error_line("\n \n"), "unknown error");
     }
 
     #[test]

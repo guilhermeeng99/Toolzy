@@ -5,7 +5,7 @@ use serde_json::Value;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
 
-use crate::download::{run_download, ytdlp_progress_args, DownloadProgress};
+use crate::download::{base_ytdlp_args, run_download, ytdlp_progress_args, DownloadProgress};
 use crate::transcription::{
     ensure_transcription_model_ready, transcribe_path_to_base, TranscribeProgress, TranscribeState,
 };
@@ -30,6 +30,10 @@ struct TranscriptSegment {
     start_ms: u64,
     end_ms: u64,
     text: String,
+    /// Whether this segment opens a new word. Whisper tokens are *subwords* and encode the
+    /// boundary as a leading space (`" ent"` + `"rando"` = one word), so joining every token
+    /// with a space shredded real words into `"ent rando"`. Whole-word segments set this true.
+    starts_word: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -66,13 +70,15 @@ fn output_base(downloads: &Path, title: &str) -> PathBuf {
     downloads.join(format!("{title} - transcript"))
 }
 
+/// Cookies are out of scope for link transcription, so the shared base args are built
+/// with `None` and can only fail on a cookie browser we never pass.
 fn build_audio_download_args(
     template: String,
     ffmpeg_dir: Option<&Path>,
     url: String,
-) -> Vec<String> {
-    let mut args = vec![
-        "--ignore-config".into(),
+) -> Result<Vec<String>, String> {
+    let mut args = base_ytdlp_args(None)?;
+    args.extend([
         "--no-playlist".into(),
         "--windows-filenames".into(),
         "--trim-filenames".into(),
@@ -81,14 +87,27 @@ fn build_audio_download_args(
         "ba/bestaudio/best".into(),
         "-o".into(),
         template,
-    ];
+    ]);
     if let Some(dir) = ffmpeg_dir {
         args.push("--ffmpeg-location".into());
         args.push(dir.to_string_lossy().to_string());
     }
     args.extend(ytdlp_progress_args());
     args.push(url);
-    args
+    Ok(args)
+}
+
+/// The one media file yt-dlp left in the per-run temp dir. The dir is created empty for
+/// a single download, so an unambiguous single entry *is* the audio. Used as a fallback
+/// so a missing or unreadable path line never reaches ffmpeg as a non-existent input.
+fn only_file_in(dir: &Path) -> Option<PathBuf> {
+    let mut files = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file());
+    let first = files.next()?;
+    files.next().is_none().then_some(first)
 }
 
 async fn download_audio(
@@ -100,11 +119,13 @@ async fn download_audio(
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let template = dir.join("%(title)s.%(ext)s").to_string_lossy().to_string();
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let args = build_audio_download_args(template, exe.parent(), url);
-    let path = run_download(app, args, on_progress)
-        .await?
-        .ok_or_else(|| "Download failed. yt-dlp did not report the saved file path.".to_string())?;
-    Ok(PathBuf::from(path))
+    let args = build_audio_download_args(template, exe.parent(), url)?;
+    let reported = run_download(app, args, on_progress).await?.map(PathBuf::from);
+    match reported {
+        Some(path) if path.is_file() => Ok(path),
+        _ => only_file_in(&dir)
+            .ok_or_else(|| "Download failed. yt-dlp did not save an audio file.".to_string()),
+    }
 }
 
 fn parse_segments(json: &str) -> Result<Vec<TranscriptSegment>, String> {
@@ -133,6 +154,7 @@ fn segment_from_value(v: &Value) -> Option<TranscriptSegment> {
         start_ms: offsets.get("from")?.as_u64()?,
         end_ms: offsets.get("to")?.as_u64()?,
         text: clean_text(v.get("text")?.as_str()?),
+        starts_word: true, // whole phrases, never a subword continuation
     })
 }
 
@@ -167,6 +189,7 @@ fn split_segment_by_words(segment: TranscriptSegment) -> Vec<TranscriptSegment> 
                 start_ms: start,
                 end_ms: end.max(start + 1),
                 text: (*word).to_string(),
+                starts_word: true, // split on whitespace, so every piece is a full word
             }
         })
         .collect()
@@ -180,20 +203,28 @@ fn token_segments_from_value(v: &Value) -> Vec<TranscriptSegment> {
 }
 
 fn segment_from_token(v: &Value) -> Option<TranscriptSegment> {
-    let text = clean_token_text(v.get("text")?.as_str()?);
+    let raw = v.get("text")?.as_str()?;
+    let text = clean_token_text(raw);
     if text.is_empty() {
         return None;
     }
     let offsets = v.get("offsets")?;
     let start_ms = offsets.get("from")?.as_u64()?;
-    let end_ms = offsets.get("to")?.as_u64()?;
-    if end_ms <= start_ms {
-        return None;
-    }
+    // Whisper reports zero duration for tokens whose timing it could not resolve — that is
+    // legitimate output, not junk. Dropping them silently deleted real words from the
+    // transcript (" aí", " eu", the "Gu" of "Guilherme", which then rendered ",ilherme"
+    // because the dropped token carried the word's leading space). Keep the text and let
+    // the block inherit the surrounding timing. Bracketed special tokens ([_BEG_], [_TT_n])
+    // are already filtered out by clean_token_text above.
+    let end_ms = offsets.get("to")?.as_u64()?.max(start_ms);
     Some(TranscriptSegment {
         start_ms,
         end_ms,
         text,
+        // The leading space is the ONLY word-boundary signal Whisper emits; read it before
+        // clean_token_text trims it away. Punctuation (","), which carries no leading space,
+        // correctly reads as a continuation and stays glued to the word before it.
+        starts_word: raw.starts_with(char::is_whitespace),
     })
 }
 
@@ -222,7 +253,7 @@ fn group_segments(segments: &[TranscriptSegment]) -> Vec<TranscriptBlock> {
         match &mut current {
             Some(block) => {
                 block.end_ms = segment.end_ms;
-                append_text(&mut block.text, &segment.text);
+                append_text(&mut block.text, &segment.text, segment.starts_word);
             }
             None => {
                 current = Some(TranscriptBlock {
@@ -243,47 +274,20 @@ fn should_start_block(current: Option<&TranscriptBlock>, next: &TranscriptSegmen
     let Some(current) = current else {
         return false;
     };
+    // Never break inside a word. `starts_word` is the boundary Whisper actually reports,
+    // which replaces the old heuristic that guessed at it from short lowercase runs.
+    if !next.starts_word {
+        return false;
+    }
     next.start_ms.saturating_sub(current.end_ms) > BLOCK_PAUSE_MS
-        || (current.text.len() >= BLOCK_MAX_CHARS
-            && !is_word_fragment_boundary(&current.text, &next.text))
+        || current.text.len() >= BLOCK_MAX_CHARS
         || (current.text.len() >= BLOCK_TARGET_CHARS && ends_sentence(&current.text))
 }
 
-fn is_word_fragment_boundary(current: &str, next: &str) -> bool {
-    let Some(last) = current
-        .split_whitespace()
-        .last()
-        .map(trim_word_edge)
-    else {
-        return false;
-    };
-    let next = trim_word_edge(next);
-    if next.is_empty() || last.is_empty() {
-        return false;
-    }
-    (is_short_lower_word(last) || is_short_lower_word(next)) && last_is_joinable(current)
-}
-
-fn trim_word_edge(word: &str) -> &str {
-    word.trim_matches(|c: char| c.is_ascii_punctuation())
-}
-
-fn is_short_lower_word(word: &str) -> bool {
-    word.chars().count() <= 3
-        && word
-            .chars()
-            .all(|c| c.is_ascii_alphabetic() && c.is_ascii_lowercase())
-}
-
-fn last_is_joinable(text: &str) -> bool {
-    text.chars()
-        .rev()
-        .find(|c| !c.is_whitespace())
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '-')
-}
-
-fn append_text(out: &mut String, next: &str) {
-    if out.is_empty() || is_closing_punctuation(next) {
+fn append_text(out: &mut String, next: &str, starts_word: bool) {
+    // A continuation always concatenates — no separator, and no paragraph break either,
+    // or a sentence-ending subword would tear the next word in half.
+    if out.is_empty() || !starts_word || is_closing_punctuation(next) {
         out.push_str(next);
     } else if out.ends_with(['.', '!', '?', ':']) {
         out.push_str("\n\n");
@@ -417,7 +421,8 @@ mod tests {
     #[test]
     fn audio_args_request_best_audio_only() {
         let args =
-            build_audio_download_args("out".into(), Some(Path::new("/bin")), "https://x".into());
+            build_audio_download_args("out".into(), Some(Path::new("/bin")), "https://x".into())
+                .unwrap();
         assert!(args
             .windows(2)
             .any(|w| w[0] == "-f" && w[1] == "ba/bestaudio/best"));
@@ -425,6 +430,31 @@ mod tests {
         assert!(args.contains(&"--ignore-config".to_string()));
         assert!(args.contains(&"--ffmpeg-location".to_string()));
         assert!(args.iter().any(|s| s.contains("download:PROG|")));
+    }
+
+    #[test]
+    fn audio_args_force_utf8_output() {
+        // Regression: without --encoding utf-8, yt-dlp prints the saved path in the
+        // Windows console codepage, so an accented title ("Reunião orientação") reaches
+        // Rust as U+FFFD and ffmpeg is handed a path that does not exist.
+        let args = build_audio_download_args("out".into(), None, "https://x".into()).unwrap();
+        assert!(args.windows(2).any(|w| w[0] == "--encoding" && w[1] == "utf-8"));
+    }
+
+    #[test]
+    fn only_file_in_needs_an_unambiguous_single_file() {
+        let base = std::env::temp_dir().join(format!("toolzy-onlyfile-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        assert!(only_file_in(&base).is_none()); // empty dir
+
+        let audio = base.join("clip.webm");
+        std::fs::write(&audio, b"x").unwrap();
+        assert_eq!(only_file_in(&base), Some(audio));
+
+        std::fs::write(base.join("other.m4a"), b"x").unwrap();
+        assert!(only_file_in(&base).is_none()); // ambiguous
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
@@ -462,6 +492,86 @@ mod tests {
         assert_eq!(segments.len(), 3);
         assert_eq!(segments[0].text, "Hello");
         assert_eq!(segments[1].text, ",");
+        // The leading space is the word boundary; punctuation carries none.
+        assert!(segments[0].starts_word);
+        assert!(!segments[1].starts_word);
+        assert!(segments[2].starts_word);
+    }
+
+    #[test]
+    fn zero_duration_tokens_keep_their_text() {
+        // Regression: whisper emits from == to for tokens it could not time. Dropping them
+        // deleted real words — here the " Gu" of "Guilherme", which also carried the space
+        // that separates it from the preceding comma.
+        let json = r#"{
+            "transcription": [{
+                "offsets": {"from": 0, "to": 2000},
+                "text": " 26, Guilherme",
+                "tokens": [
+                    {"offsets": {"from": 0, "to": 0}, "text": "[_BEG_]"},
+                    {"offsets": {"from": 100, "to": 300}, "text": " 26"},
+                    {"offsets": {"from": 300, "to": 300}, "text": ","},
+                    {"offsets": {"from": 400, "to": 400}, "text": " Gu"},
+                    {"offsets": {"from": 400, "to": 900}, "text": "ilherme"}
+                ]
+            }]
+        }"#;
+        let segments = parse_segments(json).unwrap();
+        let blocks = group_segments(&segments);
+        assert_eq!(blocks[0].text, "26, Guilherme");
+        // The bracketed special token is still dropped.
+        assert!(!blocks[0].text.contains("_BEG_"));
+    }
+
+    #[test]
+    fn subword_tokens_rejoin_into_whole_words() {
+        // Regression: Whisper splits words into subword tokens (" ent" + "rando"). Trimming
+        // every token and joining with spaces produced "ent rando", "Obrig ado", "sext a".
+        let json = r#"{
+            "transcription": [{
+                "offsets": {"from": 0, "to": 3000},
+                "text": " que o pessoal for entrando. Obrigado!",
+                "tokens": [
+                    {"offsets": {"from": 100, "to": 200}, "text": " que"},
+                    {"offsets": {"from": 200, "to": 300}, "text": " o"},
+                    {"offsets": {"from": 300, "to": 400}, "text": " pessoal"},
+                    {"offsets": {"from": 400, "to": 500}, "text": " for"},
+                    {"offsets": {"from": 500, "to": 600}, "text": " ent"},
+                    {"offsets": {"from": 600, "to": 700}, "text": "rando"},
+                    {"offsets": {"from": 700, "to": 800}, "text": "."},
+                    {"offsets": {"from": 800, "to": 900}, "text": " Obrig"},
+                    {"offsets": {"from": 900, "to": 1000}, "text": "ado"},
+                    {"offsets": {"from": 1000, "to": 1100}, "text": "!"}
+                ]
+            }]
+        }"#;
+        let segments = parse_segments(json).unwrap();
+        let blocks = group_segments(&segments);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].text, "que o pessoal for entrando.\n\nObrigado!");
+    }
+
+    #[test]
+    fn a_continuation_token_never_starts_a_block() {
+        // A mid-word subword must stay glued even when the pause/length rules would split.
+        let long = "word ".repeat(200);
+        let segments = vec![
+            TranscriptSegment {
+                start_ms: 0,
+                end_ms: 60_000,
+                text: format!("{long}ent"),
+                starts_word: true,
+            },
+            TranscriptSegment {
+                start_ms: 90_000, // pause far beyond BLOCK_PAUSE_MS
+                end_ms: 90_500,
+                text: "rando".into(),
+                starts_word: false,
+            },
+        ];
+        let blocks = group_segments(&segments);
+        assert_eq!(blocks.len(), 1);
+        assert!(blocks[0].text.ends_with("entrando"));
     }
 
     #[test]
@@ -470,6 +580,7 @@ mod tests {
             start_ms: 10_000,
             end_ms: 20_000,
             text: "Question finished. Yes answer starts.".into(),
+            starts_word: true,
         });
         assert_eq!(segments.len(), 5);
         assert_eq!(segments[0].start_ms, 10_000);
@@ -486,16 +597,19 @@ mod tests {
                 start_ms: 0,
                 end_ms: 1000,
                 text: "First.".into(),
+                starts_word: true,
             },
             TranscriptSegment {
                 start_ms: 1200,
                 end_ms: 2000,
                 text: "Still first.".into(),
+                starts_word: true,
             },
             TranscriptSegment {
                 start_ms: 6000,
                 end_ms: 7000,
                 text: "Second.".into(),
+                starts_word: true,
             },
         ];
         let blocks = group_segments(&segments);
@@ -512,11 +626,13 @@ mod tests {
                 start_ms: 0,
                 end_ms: 30_000,
                 text: long_sentence,
+                starts_word: true,
             },
             TranscriptSegment {
                 start_ms: 30_200,
                 end_ms: 31_000,
                 text: "Next".into(),
+                starts_word: true,
             },
         ];
         let blocks = group_segments(&segments);
@@ -525,43 +641,19 @@ mod tests {
     }
 
     #[test]
-    fn group_segments_avoids_leading_word_fragments() {
-        let long_text = "word ".repeat(180) + "function";
-        let segments = vec![
-            TranscriptSegment {
-                start_ms: 0,
-                end_ms: 60_000,
-                text: long_text,
-            },
-            TranscriptSegment {
-                start_ms: 60_000,
-                end_ms: 60_500,
-                text: "al".into(),
-            },
-            TranscriptSegment {
-                start_ms: 60_500,
-                end_ms: 61_000,
-                text: "teams".into(),
-            },
-            TranscriptSegment {
-                start_ms: 61_000,
-                end_ms: 61_500,
-                text: "such".into(),
-            },
-        ];
-        let blocks = group_segments(&segments);
-        assert_eq!(blocks.len(), 2);
-        assert!(blocks[0].text.ends_with("function al teams"));
-        assert_eq!(blocks[1].text, "such");
+    fn append_text_keeps_punctuation_tight() {
+        let mut text = "Hello".to_string();
+        append_text(&mut text, ",", false);
+        append_text(&mut text, "world", true);
+        append_text(&mut text, ".", false);
+        assert_eq!(text, "Hello, world.");
     }
 
     #[test]
-    fn append_text_keeps_punctuation_tight() {
-        let mut text = "Hello".to_string();
-        append_text(&mut text, ",");
-        append_text(&mut text, "world");
-        append_text(&mut text, ".");
-        assert_eq!(text, "Hello, world.");
+    fn append_text_glues_a_subword_continuation() {
+        let mut text = "ent".to_string();
+        append_text(&mut text, "rando", false);
+        assert_eq!(text, "entrando");
     }
 
     #[test]
@@ -570,6 +662,7 @@ mod tests {
             start_ms: 0,
             end_ms: 61_000,
             text: "Hello.".into(),
+            starts_word: true,
         }];
         let md = render_markdown("Demo", "https://example.test", "en", &segments);
         assert!(md.contains("# Demo"));
@@ -584,6 +677,7 @@ mod tests {
             start_ms: 0,
             end_ms: 1000,
             text: "Hello.".into(),
+            starts_word: true,
         }];
         let md = render_markdown("Demo", "https://example.test", "en", &segments);
         assert!(!md.contains("Speaker labels:"));
